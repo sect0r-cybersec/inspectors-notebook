@@ -32,6 +32,7 @@ class PanelApi:
         self._dock = dock
         self._windows_light = windows_uses_light_theme
         self._collapsed = False
+        self._listener = {"browsers": 0, "tabs": 0}
         self._lock = threading.Lock()
 
     # Called from Python
@@ -51,6 +52,16 @@ class PanelApi:
     def _save(self) -> None:
         settings_store.save(self._settings, self._path)
 
+    def _set_listener(self, listener: dict) -> None:
+        with self._lock:
+            self._listener = dict(listener)
+
+    def _expand(self) -> None:
+        with self._lock:
+            if self._collapsed:
+                self._collapsed = False
+                self._dock.apply(self._layout())
+
     # Called from the page
 
     def get_state(self) -> dict:
@@ -60,6 +71,7 @@ class PanelApi:
                 "theme": self._effective_theme(),
                 "width": self._settings.width,
                 "collapsed": self._collapsed,
+                "listener": dict(self._listener),
             }
 
     def toggle_side(self) -> dict:
