@@ -11,7 +11,8 @@
   ],
   "host_permissions": [
     "https://security.microsoft.com/*",
-    "https://portal.azure.com/*"
+    "https://portal.azure.com/*",
+    "https://*.reactblade.portal.azure.net/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -31,7 +32,8 @@
     {
       "matches": [
         "https://security.microsoft.com/*",
-        "https://portal.azure.com/*"
+        "https://portal.azure.com/*",
+        "https://*.reactblade.portal.azure.net/*"
       ],
       "js": [
         "time.js",
@@ -48,7 +50,8 @@
     {
       "matches": [
         "https://security.microsoft.com/*",
-        "https://portal.azure.com/*"
+        "https://portal.azure.com/*",
+        "https://*.reactblade.portal.azure.net/*"
       ],
       "js": [
         "vendor/browser-polyfill.min.js",

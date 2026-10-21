@@ -146,8 +146,8 @@ async function onCapture(payload, tab) {
   if (payload.kind === "query") {
     send({ ...common, language: String(payload.language), query: String(payload.query) });
   } else if (payload.kind === "result") {
-    const { status, rowCount, columns, rows, truncated, entities } = payload;
-    send({ ...common, status, rowCount, columns, rows, truncated, entities });
+    const { status, rowCount, columns, rows, truncated, entities, error } = payload;
+    send({ ...common, status, rowCount, columns, rows, truncated, entities, error: error ? String(error) : undefined });
     screenshot(tab, "results");
   }
 }

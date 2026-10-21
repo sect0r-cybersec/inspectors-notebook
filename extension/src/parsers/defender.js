@@ -1,17 +1,32 @@
 "use strict";
 
 // Defender XDR (security.microsoft.com), including Sentinel in the unified portal.
+// Rules come from purple team lab captures (tests/fixtures/defender/).
 //
-// GAPS, to fill from purple team lab captures (tests/manual/S3-lab-capture-guide.md):
-// - incidentUrls: the incident and alert page URL formats, with the ID as (?<id>...).
-// - queryRequests: the advanced hunting request (URL, method, where the KQL sits in the
-//   body) and the shape of its response (columns and rows).
-// Until then this parser records page visits only; it never guesses.
+// GAP: incidentUrls. The lab captures had no incident or alert page, so incident IDs
+// are not read yet (tests/manual/S3-lab-capture-guide.md, section 3).
 globalThis.InspectorParsers.registerParser({
   id: "defender",
   name: "Defender XDR",
-  version: "0.1.0",
+  version: "0.2.0",
   origins: ["https://security.microsoft.com"],
   incidentUrls: [],
-  queryRequests: [],
+  queryRequests: [
+    {
+      // Advanced hunting: the KQL is in QueryText; columns are in Schema and each row
+      // is an object keyed by column name. A failed query is a 400 with ErrorMessage.
+      url: /^https:\/\/security\.microsoft\.com\/apiproxy\/hunting\/huntingQueryExecutorService\/queryExecutor\/v1\/external(\?|$)/,
+      method: "POST",
+      language: "KQL",
+      query: (body) => body.QueryText,
+      results: (json) =>
+        Array.isArray(json.Schema) && Array.isArray(json.Results)
+          ? {
+              columns: json.Schema.map((c) => c.Name),
+              rows: json.Results.map((row) => json.Schema.map((c) => row[c.Name])),
+            }
+          : null,
+      error: (json) => json.ErrorMessage,
+    },
+  ],
 });

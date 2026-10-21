@@ -2,7 +2,7 @@
 // nothing is captured while the app is closed. Needs the relay registered
 // (uv run inspectors-notebook-register install) and the companion closed.
 import { chromium, expect, test } from "@playwright/test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -158,7 +158,7 @@ test("console pages keep working with the request hook installed", async () => {
     return { viaFetch, viaXhr, hooked: typeof window.InspectorHook };
   });
   expect(results).toEqual({ viaFetch: { ok: true }, viaXhr: { ok: true }, hooked: "object" });
-  // No console request rules ship yet (they come from lab captures), so nothing is captured.
+  // /api/hunt is not a console query endpoint, so nothing is captured.
   await page.waitForTimeout(500);
   expect(fake.messages.filter((m) => m.kind === "query" || m.kind === "result")).toEqual([]);
 });
@@ -191,4 +191,65 @@ test("no screenshots unless a case is recording", async () => {
   await fake.waitFor((m) => m.type === "event" && m.url === `${CONSOLE}/not-recording`);
   await page.waitForTimeout(1500);
   expect(fake.messages.filter((m) => m.type === "screenshot_request")).toEqual([]);
+});
+
+// Lab fixtures replayed in the real browser: proves the hook runs where each console
+// sends its queries. Responses are served locally from tests/fixtures/.
+function labFixture(console_, name) {
+  return JSON.parse(readFileSync(new URL(`fixtures/${console_}/${name}.json`, import.meta.url), "utf8"));
+}
+
+test("Defender advanced hunting queries are captured with their results", async () => {
+  const f = labFixture("defender", "rows");
+  const endpoint = f.request.url.split("?")[0];
+  await context.route(`${endpoint}**`, (route) =>
+    route.fulfill({ status: f.response.status, contentType: "application/json", body: f.response.body }),
+  );
+  try {
+    const page = await context.newPage();
+    await page.goto(`${CONSOLE}/v2/advanced-hunting`);
+    await page.evaluate(async ({ url, body }) => (await fetch(url, { method: "POST", body })).json(), f.request);
+
+    const query = await fake.waitFor((m) => m.kind === "query");
+    expect(query).toMatchObject({ console: "defender", language: "KQL", query: JSON.parse(f.request.body).QueryText });
+    const result = await fake.waitFor((m) => m.kind === "result");
+    expect(result).toMatchObject({ console: "defender", queryId: query.queryId, status: 200, rowCount: 4 });
+    expect(result.columns).toContain("DeviceName");
+  } finally {
+    await context.unroute(`${endpoint}**`);
+  }
+});
+
+test("Sentinel Logs queries are captured from the reactblade frame", async () => {
+  const f = labFixture("sentinel", "rows");
+  const frameUrl = f.pageUrl; // https://sandbox-5.reactblade.portal.azure.net/
+  const routes = {
+    "https://portal.azure.com/**": (route) =>
+      route.fulfill({ contentType: "text/html", body: `<title>Sentinel lab</title><iframe src="${frameUrl}"></iframe>` }),
+    [`${frameUrl}**`]: (route) => route.fulfill({ contentType: "text/html", body: "<title>Logs</title>" }),
+    "https://api.loganalytics.io/**": (route) =>
+      route.fulfill({
+        status: f.response.status,
+        contentType: "application/json",
+        headers: { "access-control-allow-origin": "*" },
+        body: f.response.body,
+      }),
+  };
+  for (const [url, handler] of Object.entries(routes)) await context.route(url, handler);
+  try {
+    const page = await context.newPage();
+    await page.goto("https://portal.azure.com/#view/Microsoft_Azure_Security_Insights");
+    await expect.poll(() => page.frames().some((fr) => fr.url().startsWith(frameUrl))).toBe(true);
+    const frame = page.frames().find((fr) => fr.url().startsWith(frameUrl));
+    await frame.waitForLoadState();
+    await frame.evaluate(async ({ url, body }) => (await fetch(url, { method: "POST", body })).json(), f.request);
+
+    const query = await fake.waitFor((m) => m.kind === "query");
+    expect(query).toMatchObject({ console: "sentinel", query: JSON.parse(f.request.body).query });
+    expect(query.url).toMatch(/^https:\/\/portal\.azure\.com\//); // the tab, not the frame
+    const result = await fake.waitFor((m) => m.kind === "result");
+    expect(result).toMatchObject({ console: "sentinel", rowCount: 4 });
+  } finally {
+    for (const url of Object.keys(routes)) await context.unroute(url);
+  }
 });

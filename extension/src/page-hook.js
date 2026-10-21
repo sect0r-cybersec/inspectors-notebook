@@ -24,16 +24,14 @@
     }
 
     function captured(found, status, responseBody) {
+      const common = { kind: "result", queryId: found.queryId, ts: now(), console: found.match.parser.id, status };
       const results = parsers.readResults(found.match.rule, responseBody);
-      if (!results) return;
-      post({
-        kind: "result",
-        queryId: found.queryId,
-        ts: now(),
-        console: found.match.parser.id,
-        status,
-        ...parsers.summariseResults(results),
-      });
+      if (results) {
+        post({ ...common, ...parsers.summariseResults(results) });
+        return;
+      }
+      const error = parsers.readError(found.match.rule, responseBody);
+      if (error) post({ ...common, rowCount: null, error });
     }
 
     const originalFetch = win.fetch;

@@ -1,0 +1,13 @@
+{
+  "about": "Lab capture of a error query, sanitised: GUIDs and lab resource names replaced.",
+  "pageUrl": "https://sandbox-5.reactblade.portal.azure.net/",
+  "request": {
+    "method": "POST",
+    "url": "https://api.loganalytics.io/v1/subscriptions/00000000-0000-0000-0000-000000000002/resourceGroups/rg-lab/providers/Microsoft.OperationalInsights/workspaces/law-lab/query?&timespan=2026-05-01T11:12:07.385Z/2026-10-21T11:12:07.385Z",
+    "body": "{\"query\":\"Devicevents\\n| take 10\\n\",\"options\":{\"truncationMaxSize\":67108864},\"maxRows\":1001,\"workspaceFilters\":{\"regions\":[]}}"
+  },
+  "response": {
+    "status": 400,
+    "body": "{\"error\":{\"message\":\"The request had some invalid properties\",\"code\":\"BadArgumentError\",\"correlationId\":\"00000000-0000-0000-0000-000000000004\",\"innererror\":{\"code\":\"SemanticError\",\"message\":\"A semantic error occurred.\",\"innererror\":{\"code\":\"SEM0100\",\"message\":\"'take' operator: Failed to resolve table or column expression named 'Devicevents'\"}}}}"
+  }
+}

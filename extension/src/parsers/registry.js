@@ -2,9 +2,10 @@
 
 // Console parsers (FR-16): one isolated, versioned module per console, registered here.
 // A parser declares the console's origins, how to find an incident ID in a page URL
-// (FR-2), and which outgoing requests carry a submitted query and how to read the query
-// and its results from them (FR-12). Loaded in the page (for the request hook) and in
-// the background script.
+// (FR-2), and which outgoing requests carry a submitted query and how to read the query,
+// its results and any error from them (FR-12). Origins may use a leading wildcard for
+// frames, such as https://*.example.net. Loaded in the page (for the request hook) and
+// in the background script.
 (() => {
   const MAX_ROWS = 5000; // full results stay in the case (S4); this caps one message
 
@@ -26,6 +27,13 @@
     parsers.push(Object.freeze({ ...parser, queryRequests: queryRequests ?? [] }));
   }
 
+  function originMatches(pattern, origin) {
+    const wildcard = pattern.indexOf("://*.");
+    if (wildcard === -1) return pattern === origin;
+    const scheme = pattern.slice(0, wildcard + 3);
+    return origin.startsWith(scheme) && origin.slice(scheme.length).endsWith(pattern.slice(wildcard + 4));
+  }
+
   function parserFor(url) {
     let origin;
     try {
@@ -33,7 +41,7 @@
     } catch {
       return null;
     }
-    return parsers.find((p) => p.origins.includes(origin)) ?? null;
+    return parsers.find((p) => p.origins.some((o) => originMatches(o, origin))) ?? null;
   }
 
   function incidentFromUrl(url) {
@@ -84,6 +92,16 @@
     }
   }
 
+  function readError(rule, responseBody) {
+    if (typeof rule.error !== "function") return null;
+    try {
+      const message = rule.error(parseJson(responseBody));
+      return typeof message === "string" && message ? message : null;
+    } catch {
+      return null;
+    }
+  }
+
   // Rows are sent capped; entities are drawn from every row.
   function summariseResults({ columns, rows }) {
     const entities = [];
@@ -115,6 +133,7 @@
     matchQueryRequest,
     readQuery,
     readResults,
+    readError,
     summariseResults,
     all: () => [...parsers],
   };

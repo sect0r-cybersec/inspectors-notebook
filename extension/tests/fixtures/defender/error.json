@@ -1,0 +1,13 @@
+{
+  "about": "Lab capture of a error query, sanitised: GUIDs and lab resource names replaced.",
+  "pageUrl": "https://security.microsoft.com/v2/advanced-hunting?tid=00000000-0000-0000-0000-000000000001",
+  "request": {
+    "method": "POST",
+    "url": "https://security.microsoft.com/apiproxy/hunting/huntingQueryExecutorService/queryExecutor/v1/external?useFanOut=false",
+    "body": "{\"QueryText\":\"DeviceFileEven\\r\\n| take 10\",\"EncodedQueryText\":\"DeviceFileEven\\r\\n| take 10\",\"StartTime\":\"2026-09-21T11:20:50.833Z\",\"EndTime\":\"2026-10-21T11:20:50.833Z\",\"MaxRecordCount\":null,\"TenantIds\":null,\"tenantIds\":null,\"selectedWorkspaces\":null,\"QueryOrigin\":\"User\"}"
+  },
+  "response": {
+    "status": 400,
+    "body": "{\"ErrorCode\":1,\"ErrorMessage\":\"'take' operator: Failed to resolve table or column expression named 'DeviceFileEven'\",\"RecommendedAction\":\"Fix semantic errors in your query\",\"Token\":null,\"Line\":null,\"Position\":null,\"CorrelationId\":null}"
+  }
+}
