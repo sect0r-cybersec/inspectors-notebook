@@ -49,7 +49,7 @@ class CaseManager:
         self._case: dict | None = None
         self._events: list[dict] = []
         self._decisions: list[Decision] = []
-        self._manual: dict[int, str] = {}
+        self._marks: dict[int, dict] = {}  # per event: disposition, star, annotation, pin
         self._context = CaseContext()
         self._paused = False
         self._elapsed = 0.0
@@ -126,13 +126,16 @@ class CaseManager:
         item = {**item, "id": len(self._events) + 1}
         if self._case.get("tenant") is None and item.get("tenant"):
             self._case["tenant"] = self._context.tenant = item["tenant"]
-        decision = rules.decide(item, self._context, idle=item.get("idle", False), manual=self._manual.get(item["id"]))
+        decision = rules.decide(item, self._context, idle=item.get("idle", False), manual=self._disposition(item["id"]))
         self._remember(item, decision)
         self._events.append(item)
         self._decisions.append(decision)
         self._store.append_event(self._case["id"], item)
         self._case["lastActivity"] = item.get("ts") or self._now()
         self._store.save_meta(self._case)
+
+    def _disposition(self, event_id: int) -> str | None:
+        return self._marks.get(event_id, {}).get("disposition")
 
     def _remember(self, item: dict, decision: Decision) -> None:
         """Kept pages and queries make later identical ones duplicates (FR-18)."""
@@ -148,7 +151,7 @@ class CaseManager:
         self._context = CaseContext(entities=list(self._case["entities"]), tenant=self._case.get("tenant"))
         self._decisions = []
         for item in self._events:
-            decision = rules.decide(item, self._context, idle=item.get("idle", False), manual=self._manual.get(item["id"]))
+            decision = rules.decide(item, self._context, idle=item.get("idle", False), manual=self._disposition(item["id"]))
             self._remember(item, decision)
             self._decisions.append(decision)
 
@@ -217,9 +220,9 @@ class CaseManager:
         incident_id = (incident_id or "").strip() or None
         existing = self._store.find_by_incident(console, incident_id) if incident_id else None
         if existing:  # FR-7: reopening a known incident resumes its case
-            meta, events, manual = self._store.load(existing)
+            meta, events, marks = self._store.load(existing)
             meta["entities"] = list(dict.fromkeys(meta.get("entities", []) + list(entities)))
-            self._case, self._events, self._manual = meta, events, manual
+            self._case, self._events, self._marks = meta, events, marks
         else:
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             base = f"{stamp}-{_slug(incident_id)}" if incident_id else stamp
@@ -240,7 +243,7 @@ class CaseManager:
                 "pinned": False,
             }
             self._store.create(self._case)
-            self._events, self._manual = [], {}
+            self._events, self._marks = [], {}
         self._rerun()
         self._suggestion = None
         self._dwell = None
@@ -291,7 +294,7 @@ class CaseManager:
             return
         self._case["lastActivity"] = self._now()
         self._store.save_meta(self._case)
-        self._case, self._events, self._decisions, self._manual = None, [], [], {}
+        self._case, self._events, self._decisions, self._marks = None, [], [], {}
         self._context = CaseContext()
         self._paused, self._running_since, self._elapsed = False, None, 0.0
         self._suggestion = None
@@ -318,16 +321,59 @@ class CaseManager:
         self._on_change()
 
     def set_decision(self, event_id: int, disposition: str | None) -> None:
-        """Keep or hide one event; None restores the rules' decision."""
+        """Keep or hide one event; None restores the rules' decision (FR-24)."""
         if disposition not in (rules.KEEP, rules.HIDE, None):
             raise ValueError(disposition)
+        self._mark(event_id, "disposition", disposition, rerun=True)
+
+    def set_star(self, event_id: int, starred: bool) -> None:
+        """Mark an event as a finding; findings lead the export."""
+        self._mark(event_id, "star", bool(starred))
+
+    def set_annotation(self, event_id: int, text: str) -> None:
+        self._mark(event_id, "annotation", str(text).strip()[:2000])
+
+    def set_pin(self, event_id: int, pinned: bool) -> None:
+        """Include a screenshot in the export (FR-26)."""
+        self._mark(event_id, "pin", bool(pinned))
+
+    def _mark(self, event_id: int, field: str, value, rerun: bool = False) -> None:
         with self._lock:
             if not self._case or not 1 <= event_id <= len(self._events):
                 return
-            if disposition:
-                self._manual[event_id] = disposition
+            marks = self._marks.setdefault(event_id, {})
+            if value in (None, False, ""):
+                marks.pop(field, None)
             else:
-                self._manual.pop(event_id, None)
-            self._store.append_decision(self._case["id"], event_id, disposition)
-            self._rerun()
+                marks[field] = value
+            self._store.append_action(self._case["id"], event_id, field, value)
+            if rerun:
+                self._rerun()
+        self._on_change()
+
+    def add_note(self, text: str) -> None:
+        """A timestamped free-text note in the timeline (FR-25)."""
+        text = str(text).strip()
+        with self._lock:
+            if not self._case or not text:
+                return
+            self._record({"kind": "note", "text": text[:4000], "ts": self._now(), "idle": False})
+        self._on_change()
+
+    def marks(self) -> dict[int, dict]:
+        with self._lock:
+            return {k: dict(v) for k, v in self._marks.items()}
+
+    def case_meta(self) -> dict | None:
+        with self._lock:
+            return dict(self._case) if self._case else None
+
+    def mark_exported(self) -> None:
+        """Remember the case was exported, so the cache does not warn about it (FR-32)."""
+        with self._lock:
+            if not self._case:
+                return
+            self._case["exported"] = True
+            self._case["exportedAt"] = self._now()
+            self._store.save_meta(self._case)
         self._on_change()

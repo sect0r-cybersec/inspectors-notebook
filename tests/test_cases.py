@@ -182,7 +182,7 @@ def test_keep_hide_and_restore_one_event(manager, store):  # FR-24
     manager.set_decision(1, None)
     assert dispositions(manager)[0][1:] == ("keep", "console")
     manager.set_decision(1, "hide")
-    assert store.load(case_id)[2] == {1: "hide"}
+    assert store.load(case_id)[2] == {1: {"disposition": "hide"}}
     with pytest.raises(ValueError):
         manager.set_decision(1, "delete")
 
