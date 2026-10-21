@@ -31,7 +31,9 @@ class Refresher:
         self._stopped.set()
         self._wanted.set()
         if self._thread:
-            self._thread.join(5)
+            # Short: when the window closes, a refresh in flight may be waiting on the UI
+            # thread that is calling this.
+            self._thread.join(1)
 
     def request(self) -> None:
         self._wanted.set()
