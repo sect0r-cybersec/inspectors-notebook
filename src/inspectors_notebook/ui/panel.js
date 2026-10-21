@@ -193,7 +193,7 @@ function renderCase() {
     $(".pause-label").textContent = paused ? "Resume" : "Pause";
     $(".rail-rec").setAttribute("aria-label", paused ? "Case paused" : "Recording");
 
-    const where = [c.incidentId ? `Incident ${c.incidentId}` : "Manual case", CONSOLE_NAMES[c.console], c.tenant && `Tenant ${c.tenant}`];
+    const where = [c.incidentId ? `Incident ${c.incidentId}` : "Manual case", CONSOLE_NAMES[c.console] ?? c.console, c.tenant && `Tenant ${c.tenant}`];
     $(".case-meta").textContent = where.filter(Boolean).join(" · ");
     $(".case-title").textContent = c.title || "Untitled case";
 
@@ -214,7 +214,7 @@ function renderCase() {
     const switching = s.kind === "switch";
     $(".suggestion-kicker").textContent = switching ? "A different incident is open" : "Incident detected";
     $(".suggestion-title").textContent = s.title || `Incident ${s.incidentId}`;
-    $(".suggestion-meta").textContent = [`Incident ${s.incidentId}`, CONSOLE_NAMES[s.console]].filter(Boolean).join(" · ");
+    $(".suggestion-meta").textContent = [`Incident ${s.incidentId}`, CONSOLE_NAMES[s.console] ?? s.console].filter(Boolean).join(" · ");
     $('[data-case="accept_suggestion"]').textContent = switching ? "Switch case" : s.resume ? "Resume case" : "Start case";
     $('.suggestion [data-case="pause"]').hidden = !switching;
     $('[data-case="dismiss_suggestion"]').textContent = switching ? "Keep going" : "Not now";

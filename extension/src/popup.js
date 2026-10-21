@@ -24,6 +24,16 @@ function render(s) {
     : `${s.tab.console} · ${s.tab.paused ? "paused" : "capturing"}`;
   $(".pause").hidden = !s.tab;
   $('[data-action="set_paused"]').checked = Boolean(s.tab?.paused);
+
+  // Any HTTPS site can be added; the consoles that ship with the extension cannot be removed.
+  const site = s.site;
+  $(".site").hidden = !site || (site.listened && !site.added);
+  if (site) {
+    const host = new URL(site.origin).hostname;
+    $(".site-text").textContent = site.listened ? `${host} · listening` : `${host} · not listening`;
+    $('[data-site="add"]').hidden = site.listened;
+    $('[data-site="remove"]').hidden = !site.added;
+  }
   state = s;
 }
 
@@ -34,6 +44,19 @@ async function refresh() {
 }
 
 document.addEventListener("click", async (event) => {
+  const siteButton = event.target.closest("button[data-site]");
+  if (siteButton && state?.site) {
+    const origin = state.site.origin;
+    if (siteButton.dataset.site === "add") {
+      // Must be the first await in the click, so the browser sees the user's gesture.
+      const granted = await browser.permissions.request({ origins: [`${origin}/*`] });
+      if (granted) await browser.runtime.sendMessage({ type: "add_site", origin });
+    } else {
+      await browser.runtime.sendMessage({ type: "remove_site", origin });
+    }
+    refresh();
+    return;
+  }
   const el = event.target.closest("button[data-action]");
   if (!el) return;
   await browser.runtime.sendMessage({ type: el.dataset.action });

@@ -253,3 +253,13 @@ test("Sentinel Logs queries are captured from the reactblade frame", async () =>
     for (const url of Object.keys(routes)) await context.unroute(url);
   }
 });
+
+test("incident pages are recognised without console-specific rules", async () => {
+  const page = await context.newPage();
+  await page.goto(`${CONSOLE}/incidents/4821/overview`);
+  const visit = await fake.waitFor((m) => m.type === "event" && m.url === `${CONSOLE}/incidents/4821/overview`);
+  expect(visit).toMatchObject({ incidentId: "4821", recordKind: "incident", navigationOnly: false });
+  await page.goto(`${CONSOLE}/incidents`);
+  const list = await fake.waitFor((m) => m.type === "event" && m.url === `${CONSOLE}/incidents`);
+  expect(list).toMatchObject({ incidentId: null, navigationOnly: true });
+});

@@ -7,6 +7,7 @@ if (typeof importScripts === "function") {
     "vendor/browser-polyfill.min.js",
     "time.js",
     "entities.js",
+    "incidents.js",
     "parsers/registry.js",
     "parsers/defender.js",
     "parsers/sentinel.js",
@@ -85,7 +86,7 @@ async function pausedTabs() {
 }
 
 async function listeningTabs() {
-  const [tabs, paused] = await Promise.all([browser.tabs.query({ url: CONSOLE_PATTERNS }), pausedTabs()]);
+  const [tabs, paused] = await Promise.all([browser.tabs.query({ url: consolePatterns() }), pausedTabs()]);
   return tabs.filter((t) => !paused.has(t.id));
 }
 
@@ -110,6 +111,7 @@ async function onTabUpdated(tabId, change, tab) {
     return;
   }
   if ((await pausedTabs()).has(tabId)) return;
+  const record = Parsers.incidentFromUrl(tab.url);
   send({
     type: "event",
     kind: "page_visit",
@@ -121,7 +123,8 @@ async function onTabUpdated(tabId, change, tab) {
     url: tab.url,
     title: tab.title,
     tenant: Parsers.tenantFromUrl(tab.url),
-    incidentId: Parsers.incidentFromUrl(tab.url)?.incidentId ?? null,
+    incidentId: record?.incidentId ?? null,
+    recordKind: record?.kind ?? null,
     navigationOnly: Parsers.isNavigationOnly(tab.url),
   });
   if (tab.active) screenshot(tab, "navigation");
@@ -214,16 +217,34 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       await onCapture(message.payload ?? {}, sender.tab);
       return true;
     case "popup_state": {
+      // activeTab lets the popup see the current tab's address, even on sites not listened to.
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       const console_ = tab ? consoleFor(tab.url) : null;
       const { openOnConsole = false } = await browser.storage.local.get("openOnConsole");
+      const origin = tab?.url?.startsWith("https://") ? new URL(tab.url).origin : null;
       return {
         app: state.app,
         recording: state.recording,
         listening: (await listeningTabs()).length,
         tab: console_ && { id: tab.id, console: console_.name, paused: (await pausedTabs()).has(tab.id) },
+        site: origin && { origin, listened: Boolean(console_), added: Boolean(console_?.added) },
         openOnConsole,
       };
+    }
+    case "add_site": {
+      // The popup asked the browser for this site; only add it if permission was granted.
+      const origin = new URL(message.origin).origin;
+      if (!(await browser.permissions.contains({ origins: [`${origin}/*`] }))) return false;
+      const { sites = [] } = await browser.storage.local.get("sites");
+      if (!sites.includes(origin)) await browser.storage.local.set({ sites: [...sites, origin] });
+      return true;
+    }
+    case "remove_site": {
+      const origin = new URL(message.origin).origin;
+      const { sites = [] } = await browser.storage.local.get("sites");
+      await browser.storage.local.set({ sites: sites.filter((s) => s !== origin) });
+      await browser.permissions.remove({ origins: [`${origin}/*`] }).catch(() => {});
+      return true;
     }
     case "open_app":
       connect();
@@ -238,5 +259,22 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
   }
 });
 
+// Sites added from the popup, kept only while their permission is still granted.
+async function loadAddedSites() {
+  const { sites = [] } = await browser.storage.local.get("sites");
+  const granted = [];
+  for (const origin of sites) {
+    if (await browser.permissions.contains({ origins: [`${origin}/*`] })) granted.push(origin);
+  }
+  setAddedSites(granted);
+  reportTabs();
+}
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.sites) loadAddedSites();
+});
+browser.permissions.onRemoved?.addListener(loadAddedSites);
+
 setState({});
+loadAddedSites();
 connect();
