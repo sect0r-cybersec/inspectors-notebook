@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Inspector's Notebook listener",
+  "short_name": "Inspector",
+  "version": "0.1.0",
+  "description": "Listens in security consoles for the Inspector's Notebook desktop app. Nothing is captured unless the app is open.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArkOtyHq08bF1zFR0+bhb0bDV9qZIoPEkSnQDL/WrXskw0RUV2fTcoMO90PiL5TE4aAYdQOkbZTik4qFoNvaCX6N0NJBU0cdweXLfWbG2lQfvjSoXCIcHS/zYXvAx9I8rVoxOilFZ90yHBLu/n7hznvnZCQUfIa6I//m0zixLfTXDaVRkFTaBCFEdQb0ukI1FgeZtNECjvtLiaLOmuZfo7CcN5GEZSv9aIPff/5TCdPlETQCKmopE8nf79o7LCjYJUyx3cKzYLONsl6PX52C9r+cZJ8XRixUIjxXqoD3AWK47I2B69HS6FK3FDIGge/AhUcftw+PYa7fdnvpbhGLHkQIDAQAB",
+  "permissions": ["nativeMessaging", "storage"],
+  "host_permissions": ["https://security.microsoft.com/*", "https://portal.azure.com/*"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["vendor/browser-polyfill.min.js", "consoles.js", "icon.js", "background.js"]
+  },
+  "action": {
+    "default_title": "Inspector: app closed",
+    "default_popup": "popup.html"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{52724e34-54e6-4e08-bebb-ad98a8877daa}",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  }
+}
