@@ -7,12 +7,16 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArkOtyHq08bF1zFR0+bhb0bDV9qZIoPEkSnQDL/WrXskw0RUV2fTcoMO90PiL5TE4aAYdQOkbZTik4qFoNvaCX6N0NJBU0cdweXLfWbG2lQfvjSoXCIcHS/zYXvAx9I8rVoxOilFZ90yHBLu/n7hznvnZCQUfIa6I//m0zixLfTXDaVRkFTaBCFEdQb0ukI1FgeZtNECjvtLiaLOmuZfo7CcN5GEZSv9aIPff/5TCdPlETQCKmopE8nf79o7LCjYJUyx3cKzYLONsl6PX52C9r+cZJ8XRixUIjxXqoD3AWK47I2B69HS6FK3FDIGge/AhUcftw+PYa7fdnvpbhGLHkQIDAQAB",
   "permissions": [
     "nativeMessaging",
-    "storage"
+    "storage",
+    "activeTab"
   ],
   "host_permissions": [
     "https://security.microsoft.com/*",
     "https://portal.azure.com/*",
     "https://*.reactblade.portal.azure.net/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -20,6 +24,7 @@
       "vendor/browser-polyfill.min.js",
       "time.js",
       "entities.js",
+      "incidents.js",
       "parsers/registry.js",
       "parsers/defender.js",
       "parsers/sentinel.js",

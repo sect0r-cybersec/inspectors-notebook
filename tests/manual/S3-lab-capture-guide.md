@@ -2,10 +2,7 @@
 
 Sections 1 and 2 are done: the Defender XDR and Sentinel query rules in `extension/src/parsers/` were written from lab captures on 21 October 2026, with sanitised fixtures in `extension/tests/fixtures/`. Still open: section 3, incident and alert URLs, because the lab had no incidents to capture. Until then incident IDs are not read. Re-run sections 1 and 2 if a console update breaks query capture.
 
-**Deferred S3 exit items (owner's decision, 21 October 2026).** S3 moves on without these, because the lab has no incidents yet:
-
-- Incident and alert URL patterns (section 3). Until they exist, incident IDs are not read, so S4's start detection (FR-2, FR-3) cannot recognise incident pages.
-- The 20-query check (last section).
+**Deferred S3 exit item (owner's decision, 21 October 2026).** The 20-query check (last section) is deferred. Incident and alert URL patterns (section 3) are no longer needed: a generic recogniser finds record pages on any site (see `docs/decisions.md`); console-specific patterns are optional refinements.
 
 Use the lab tenant only. Never capture from a client tenant.
 
@@ -27,7 +24,7 @@ Repeat section 1 in Sentinel's Logs blade at `portal.azure.com`. Also note:
 - whether the query editor runs in a frame on another origin (DevTools, Sources tab, frames list); if it does, that origin needs adding to the extension's permissions
 - which request carries the query, and from which frame
 
-## 3. Incident and alert URLs (still needed)
+## 3. Incident and alert URLs (optional refinement)
 
 If the lab has no incidents, raise one: on an onboarded lab device, run Microsoft's detection test from the Defender portal (Settings, Endpoints, Onboarding, "Run a detection test"), or run a Caldera ability that Defender alerts on.
 

@@ -78,10 +78,13 @@ test("every shipped parser has a version and listens only on permitted console o
   }
 });
 
-test("incident IDs come from the console's own URL patterns", () => {
-  assert.deepEqual(Parsers.incidentFromUrl(`${LAB_ORIGIN}/incidents/4821?tid=lab`), { console: "lab", incidentId: "4821" });
+test("incident IDs come from the console's own patterns, then the generic recogniser", () => {
+  assert.deepEqual(Parsers.incidentFromUrl(`${LAB_ORIGIN}/incidents/4821?tid=lab`), { console: "lab", incidentId: "4821", kind: "incident" });
   assert.equal(Parsers.incidentFromUrl(`${LAB_ORIGIN}/hunting`), null);
-  assert.equal(Parsers.incidentFromUrl("https://elsewhere.test/incidents/4821"), null);
+  assert.deepEqual(Parsers.incidentFromUrl("https://security.microsoft.com/incidents/4821/overview"), {
+    console: "defender", kind: "incident", incidentId: "4821",
+  });
+  assert.deepEqual(Parsers.incidentFromUrl("https://elsewhere.test/cases/77"), { console: null, kind: "case", incidentId: "77" });
   assert.equal(Parsers.incidentFromUrl("not a url"), null);
 });
 

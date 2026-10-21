@@ -66,13 +66,16 @@
     }
   }
 
+  // A console's own patterns first; otherwise the generic recogniser (incidents.js),
+  // which works on any site without per-platform rules.
   function incidentFromUrl(url) {
     const parser = parserFor(url);
     for (const pattern of parser?.incidentUrls ?? []) {
       const id = pattern.exec(url)?.groups?.id;
-      if (id) return { console: parser.id, incidentId: id };
+      if (id) return { console: parser.id, incidentId: id, kind: "incident" };
     }
-    return null;
+    const generic = globalThis.InspectorIncidents?.recordFromUrl(url);
+    return generic ? { console: parser?.id ?? null, ...generic } : null;
   }
 
   // pageUrl is the console page making the request; requestUrl is where it goes.

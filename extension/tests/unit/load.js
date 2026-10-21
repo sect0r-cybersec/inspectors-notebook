@@ -2,6 +2,7 @@
 // They publish themselves on globalThis, as they do in the browser.
 import "../../src/time.js";
 import "../../src/entities.js";
+import "../../src/incidents.js";
 import "../../src/parsers/registry.js";
 import "../../src/parsers/defender.js";
 import "../../src/parsers/sentinel.js";
