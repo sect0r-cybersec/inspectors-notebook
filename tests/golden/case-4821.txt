@@ -1,0 +1,25 @@
+Incident 4821 | Driver loads on DC01 | Tenant: 00000000-0000-0000-0000-000000000001 | Defender XDR
+Case started 21/10/2026 13:08
+
+KEY FINDINGS
+13:09  DeviceEvents: 4 rows; 4 involve dc01.contoso.local; 21:05 to 21:08
+13:11  No file events on DC01 in the last 30 days
+
+TIMELINE
+
+13:08  INCIDENT Incident 4821: Driver loads on DC01
+13:09  QUERY    Hunting query (KQL)
+                DeviceEvents
+                | take 10
+                Result: 4 rows; 4 involve dc01.contoso.local; 21:05 to 21:08
+                21:05  dc01.contoso.local  system  DriverLoad  PktMon.sys  ntoskrnl.exe
+                21:06  dc01.contoso.local  system  DriverLoad  mmcss.sys  ntoskrnl.exe
+                21:08  dc01.contoso.local  system  DriverLoad  WdFilter.sys  ntoskrnl.exe
+                21:08  dc01.contoso.local  system  DriverLoad  ksld.sys  ntoskrnl.exe
+13:10  NOTE     Driver loads match Defender platform updates, not attacker activity
+13:11  QUERY    Hunting query (KQL)
+                DeviceFileEvents
+                | take 10
+                Result: No results
+                Comment: No file events on DC01 in the last 30 days
+13:13  SHOT     [screenshot 1313-0009-results.webp]

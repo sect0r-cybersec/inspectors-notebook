@@ -263,3 +263,13 @@ test("incident pages are recognised without console-specific rules", async () =>
   const list = await fake.waitFor((m) => m.type === "event" && m.url === `${CONSOLE}/incidents`);
   expect(list).toMatchObject({ incidentId: null, navigationOnly: true });
 });
+
+test("interval screenshots of the active console tab while recording", async () => {
+  await fake.stop();
+  fake = await FakeCompanion.start({ recording: true, interval: 1 });
+  await fake.waitFor((m) => m.type === "tabs");
+  const page = await context.newPage();
+  await page.goto(`${CONSOLE}/v2/advanced-hunting`);
+  const shot = await fake.waitFor((m) => m.type === "screenshot_request" && m.trigger === "interval", 10_000);
+  expect(shot).toMatchObject({ console: "defender", url: `${CONSOLE}/v2/advanced-hunting` });
+});

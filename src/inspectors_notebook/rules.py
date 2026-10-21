@@ -39,8 +39,8 @@ class CaseContext:
 
 
 def event_text(event: dict) -> str:
-    """Everything an entity could appear in: URL, title, query, error, results."""
-    parts = [event.get(k) for k in ("url", "title", "query", "error")]
+    """Everything an entity could appear in: URL, title, query, note text, error, results."""
+    parts = [event.get(k) for k in ("url", "title", "query", "text", "error")]
     parts += [" ".join(map(str, event.get("columns") or []))]
     parts += [json.dumps(event.get("rows") or [], ensure_ascii=False)]
     parts += [e.get("value", "") for e in event.get("entities") or [] if isinstance(e, dict)]

@@ -182,7 +182,7 @@ def test_keep_hide_and_restore_one_event(manager, store):  # FR-24
     manager.set_decision(1, None)
     assert dispositions(manager)[0][1:] == ("keep", "console")
     manager.set_decision(1, "hide")
-    assert store.load(case_id)[2] == {1: "hide"}
+    assert store.load(case_id)[2] == {1: {"disposition": "hide"}}
     with pytest.raises(ValueError):
         manager.set_decision(1, "delete")
 
@@ -210,3 +210,61 @@ def test_listeners_are_told_about_changes(manager):
     before = len(manager.changes)
     manager.ingest(query("x"))
     assert len(manager.changes) == before + 1
+
+
+def test_new_cases_enforce_the_cache(store, clock):  # FR-29 to FR-32
+    from inspectors_notebook.settings import Settings
+
+    m = CaseManager(store, clock=lambda: clock.t, settings=lambda: Settings(cache_size=2))
+    for i, exported in enumerate([True, False, True]):
+        case_id = m.start(incident_id=str(i))
+        if exported:
+            m.mark_exported()
+        m.stop()
+        store.update_meta(case_id, lastActivity=f"2026-10-2{i}T10:00:00+01:00")
+    newest = m.start(incident_id="9")
+    ids = [c["incidentId"] for c in m.cache_state()["cases"]]
+    assert "0" not in ids  # oldest and exported: deleted
+    assert [c["incidentId"] for c in m.cache_state()["awaitingConfirmation"]] == ["1"]  # never exported: ask first
+    unexported = m.cache_state()["awaitingConfirmation"][0]["id"]
+    m.keep_case(unexported)
+    state = m.cache_state()
+    assert state["awaitingConfirmation"] == [] and next(c for c in state["cases"] if c["id"] == unexported)["pinned"]
+    m.delete_case(newest)  # the active case is never deleted
+    assert any(c["id"] == newest for c in m.cache_state()["cases"])
+
+
+def test_opening_a_cached_case_resumes_it(manager):
+    first = manager.start(title="Manual case")
+    manager.ingest(query("kept from the first session"))
+    manager.stop()
+    manager.start(title="Another")
+    manager.open_case(first)
+    assert manager.summary()["case"]["id"] == first
+    assert [d[0] for d in dispositions(manager)] == ["kept from the first session"]
+
+
+def test_suggestions_and_dwell_follow_the_settings(store, clock):
+    from inspectors_notebook.settings import Settings
+
+    settings = Settings(suggest_cases=False)
+    m = CaseManager(store, clock=lambda: clock.t, settings=lambda: settings)
+    m.ingest(visit("https://x/incidents/1", incident="1"))
+    clock.advance(DWELL_SECONDS)
+    m.ingest(query("pivot"))
+    assert m.summary()["suggestion"] is None
+    settings.suggest_cases, settings.dwell_seconds = True, 5
+    m.ingest(visit("https://x/incidents/2", incident="2"))
+    clock.advance(5)
+    m.ingest(query("pivot"))
+    assert m.summary()["suggestion"]["incidentId"] == "2"
+
+
+def test_resuming_an_untitled_case_takes_the_new_title(manager):
+    manager.start(incident_id="4821", console="defender")
+    manager.stop()
+    manager.start(incident_id="4821", console="defender", title="Driver loads")
+    assert manager.summary()["case"]["title"] == "Driver loads"
+    manager.stop()
+    manager.start(incident_id="4821", console="defender", title="Something else")
+    assert manager.summary()["case"]["title"] == "Driver loads"  # an existing title is kept

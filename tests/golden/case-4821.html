@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Incident 4821: Driver loads on DC01</title>
+<style>body{font-family:'Segoe UI',system-ui,sans-serif;max-width:60rem;margin:2rem auto;padding:0 1rem;color:#15191E}pre,code,td{font-family:Consolas,monospace;font-size:0.9em}pre{background:#F1F3F5;padding:0.5rem;overflow:auto}table{border-collapse:collapse}td,th{border:1px solid #DDE1E6;padding:0.2rem 0.4rem;text-align:left}time{font-family:Consolas,monospace;color:#56606B;margin-right:0.5rem}</style>
+</head>
+<body>
+<h1>Incident 4821: Driver loads on DC01</h1>
+<p>Tenant: 00000000-0000-0000-0000-000000000001 · Defender XDR · Case started 21/10/2026 13:08</p>
+<h2>Key findings</h2>
+<ul>
+<li><time>13:09</time>DeviceEvents: 4 rows; 4 involve dc01.contoso.local; 21:05 to 21:08</li>
+<li><time>13:11</time>No file events on DC01 in the last 30 days</li>
+</ul>
+<h2>Timeline</h2>
+<ol>
+<li><time>13:08</time>Incident 4821: Driver loads on DC01
+</li>
+<li><time>13:09</time>Hunting query (KQL)
+<pre><code>DeviceEvents
+| take 10</code></pre>
+<p>Result: 4 rows; 4 involve dc01.contoso.local; 21:05 to 21:08</p>
+<table><tr><th>Timestamp</th><th>DeviceName</th><th>InitiatingProcessAccountName</th><th>ActionType</th><th>FileName</th><th>InitiatingProcessFileName</th></tr>
+<tr><td>21:05</td><td>dc01.contoso.local</td><td>system</td><td>DriverLoad</td><td>PktMon.sys</td><td>ntoskrnl.exe</td></tr>
+<tr><td>21:06</td><td>dc01.contoso.local</td><td>system</td><td>DriverLoad</td><td>mmcss.sys</td><td>ntoskrnl.exe</td></tr>
+<tr><td>21:08</td><td>dc01.contoso.local</td><td>system</td><td>DriverLoad</td><td>WdFilter.sys</td><td>ntoskrnl.exe</td></tr>
+<tr><td>21:08</td><td>dc01.contoso.local</td><td>system</td><td>DriverLoad</td><td>ksld.sys</td><td>ntoskrnl.exe</td></tr>
+</table>
+</li>
+<li><time>13:10</time>Note: Driver loads match Defender platform updates, not attacker activity
+</li>
+<li><time>13:11</time>Hunting query (KQL)
+<pre><code>DeviceFileEvents
+| take 10</code></pre>
+<p>Result: No results</p>
+<p>Comment: No file events on DC01 in the last 30 days</p>
+</li>
+<li><time>13:13</time>[screenshot 1313-0009-results.webp]
+</li>
+</ol>
+</body>
+</html>

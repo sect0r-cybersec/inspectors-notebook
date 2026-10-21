@@ -16,13 +16,17 @@ def test_round_trip(store):
     store.create(meta("c1", incidentId="4821", console="defender"))
     store.append_event("c1", {"id": 1, "kind": "query", "query": "DeviceInfo"})
     store.append_event("c1", {"id": 2, "kind": "result", "rowCount": 0})
-    store.append_decision("c1", 2, "hide")
-    store.append_decision("c1", 1, "keep")
-    store.append_decision("c1", 1, None)  # restored to the rules' decision
-    loaded_meta, events, manual = store.load("c1")
+    store.append_action("c1", 2, "disposition", "hide")
+    store.append_action("c1", 1, "disposition", "keep")
+    store.append_action("c1", 1, "disposition", None)  # restored to the rules' decision
+    store.append_action("c1", 1, "star", True)
+    store.append_action("c1", 1, "annotation", "Download cradle")
+    store.append_action("c1", 2, "pin", True)
+    store.append_action("c1", 2, "pin", False)
+    loaded_meta, events, marks = store.load("c1")
     assert loaded_meta["incidentId"] == "4821"
     assert [e["id"] for e in events] == [1, 2]
-    assert manual == {2: "hide"}
+    assert marks == {1: {"star": True, "annotation": "Download cradle"}, 2: {"disposition": "hide"}}
 
 
 def test_a_line_cut_short_by_a_crash_is_skipped(store):
