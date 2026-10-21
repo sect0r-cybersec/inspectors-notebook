@@ -9,9 +9,10 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export class FakeCompanion {
   messages = [];
 
-  static async start() {
+  static async start({ recording = false } = {}) {
     const fake = new FakeCompanion();
-    fake.proc = spawn("uv", ["run", "--no-sync", "python", "extension/tests/fake_companion.py"], {
+    const args = ["run", "--no-sync", "python", "extension/tests/fake_companion.py"];
+    fake.proc = spawn("uv", recording ? [...args, "--recording"] : args, {
       cwd: REPO,
       stdio: ["pipe", "pipe", "inherit"],
     });

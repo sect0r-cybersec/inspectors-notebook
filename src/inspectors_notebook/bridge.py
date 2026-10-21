@@ -1,15 +1,18 @@
 """The companion's end of the pipe: one relay connection per browser (FR-36).
 
 Tracks which browsers are connected and how many console tabs they report, and
-answers each hello with the recording state. Capture events are counted but not
-kept: the case manager that stores them arrives in S4.
+answers each hello with the recording state. Screenshot requests are captured on a
+worker thread so the pipe keeps flowing. Capture events and screenshots are counted
+but not kept: the case manager that stores them arrives in S4.
 """
 
 import logging
+import queue
 import threading
 from typing import Callable
 
 from . import pipe
+from .screenshot import Screenshotter
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +25,7 @@ class Bridge:
         server: pipe.Server,
         on_listener: Callable[[dict], None],
         on_show: Callable[[], None],
+        screenshotter: Screenshotter | None = None,
     ):
         self._server = server
         self._on_listener = on_listener
@@ -29,13 +33,20 @@ class Bridge:
         self._lock = threading.Lock()
         self._clients: dict[int, dict] = {}
         self._next_id = 0
+        self._shooter = screenshotter
+        self._shot_requests: queue.Queue = queue.Queue(maxsize=8)
         self.events_received = 0
+        self.screenshots_taken = 0
+        self.screenshots_skipped = 0
 
     def start(self) -> None:
         threading.Thread(target=self._serve, name="bridge", daemon=True).start()
+        if self._shooter:
+            threading.Thread(target=self._take_screenshots, name="screenshots", daemon=True).start()
 
     def stop(self) -> None:
         self._server.close()
+        self._shot_requests.put(None)
 
     def listener(self) -> dict:
         with self._lock:
@@ -67,6 +78,21 @@ class Bridge:
                 log.info("%s disconnected", was_browser)
                 self._notify()
 
+    def _take_screenshots(self) -> None:
+        while (item := self._shot_requests.get()) is not None:
+            browser, request = item
+            try:
+                shot = self._shooter.capture(
+                    browser, (str(request.get("source")), request.get("tabId")), str(request.get("title") or "")
+                )
+            except Exception as e:
+                log.warning("Screenshot failed: %s", e)
+                shot = None
+            if shot:
+                self.screenshots_taken += 1
+            else:
+                self.screenshots_skipped += 1
+
     def _handle(self, cid: int, conn: pipe.Connection, message: dict) -> None:
         kind = message.get("type") if isinstance(message, dict) else None
         if kind == "hello":
@@ -84,6 +110,13 @@ class Bridge:
                 self._notify()
         elif kind == "event":
             self.events_received += 1
+        elif kind == "screenshot_request":
+            with self._lock:
+                browser = self._clients[cid]["browser"]
+            try:
+                self._shot_requests.put_nowait((browser, message))
+            except queue.Full:
+                self.screenshots_skipped += 1  # captures are falling behind; drop, never block
         elif kind == "show":
             self._on_show()
         else:

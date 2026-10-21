@@ -7,6 +7,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "pillow>=12.3.0,<13",
     "pywebview>=6.2.1",
 ]
 

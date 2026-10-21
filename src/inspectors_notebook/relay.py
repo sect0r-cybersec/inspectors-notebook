@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 HOST_NAME = "inspectors_notebook.relay"
 MAX_TO_BROWSER = 1024 * 1024  # Chrome's limit for host-to-extension messages
 MAX_FROM_BROWSER = 64 * 1024 * 1024
-FORWARDED = {"hello", "tabs", "event"}  # extension message types the companion accepts
+FORWARDED = {"hello", "tabs", "event", "screenshot_request"}  # extension message types the companion accepts
 
 
 def read_message(stream: BinaryIO) -> dict | None:

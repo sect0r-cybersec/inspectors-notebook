@@ -163,6 +163,18 @@ def test_unknown_types_are_not_forwarded(browser, name):
         companion.stop()
 
 
+def test_screenshot_requests_are_forwarded_when_connected(browser, name):
+    companion = Companion(name)
+    try:
+        start_relay(browser, name)
+        assert browser.next()["app"] == "connected"
+        request = {"type": "screenshot_request", "source": "s1", "tabId": 3, "title": "Incidents", "trigger": "results"}
+        browser.send(request)
+        assert companion.next() == request
+    finally:
+        companion.stop()
+
+
 def test_reconnects_after_companion_restarts(browser, name):
     companion = Companion(name)
     start_relay(browser, name)

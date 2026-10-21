@@ -10,6 +10,7 @@ if sys.platform != "win32":
 
 from inspectors_notebook import pipe
 from inspectors_notebook.bridge import MAX_TABS, Bridge
+from inspectors_notebook.screenshot import Shot
 
 
 def wait_for(predicate, timeout=3.0):
@@ -21,13 +22,24 @@ def wait_for(predicate, timeout=3.0):
     return predicate()
 
 
+class FakeShooter:
+    """Captures nothing; returns a shot unless the title says the window is unchanged."""
+
+    def __init__(self):
+        self.calls = []
+
+    def capture(self, browser, tab_key, title):
+        self.calls.append((browser, tab_key, title))
+        return None if title == "unchanged" else Shot(b"RIFF....WEBP", 10, 10)
+
+
 @pytest.fixture
 def setup():
     name = rf"\\.\pipe\InspectorsNotebook.test.{uuid.uuid4()}"
     server = pipe.Server(name)
     server.listen()
     updates, shows = [], []
-    bridge = Bridge(server, updates.append, lambda: shows.append(True))
+    bridge = Bridge(server, updates.append, lambda: shows.append(True), FakeShooter())
     bridge.start()
     clients = []
 
@@ -105,6 +117,18 @@ def test_events_are_counted_not_kept(setup):
     held = [k for k, v in vars(bridge).items() if k != "_clients" and isinstance(v, (list, dict, tuple)) and v]
     assert held == []
     assert "security.microsoft.com" not in repr(bridge._clients)
+
+
+def test_screenshot_requests_are_captured_for_the_requesting_browser(setup):
+    bridge, client, _, _ = setup
+    c = client()
+    c.send({"type": "hello", "browser": "edge"})
+    c.receive()
+    c.send({"type": "screenshot_request", "source": "s1", "tabId": 7, "title": "Incidents", "trigger": "navigation"})
+    c.send({"type": "screenshot_request", "source": "s1", "tabId": 7, "title": "unchanged", "trigger": "tab_switch"})
+    assert wait_for(lambda: (bridge.screenshots_taken, bridge.screenshots_skipped) == (1, 1))
+    assert bridge._shooter.calls == [("edge", ("s1", 7), "Incidents"), ("edge", ("s1", 7), "unchanged")]
+    assert "WEBP" not in repr(vars(bridge))  # counted, not kept, until the case store (S4)
 
 
 def test_one_client_failing_leaves_others_working(setup):
