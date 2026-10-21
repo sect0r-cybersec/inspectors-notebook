@@ -3,8 +3,20 @@
 // Chrome and Edge run this as a service worker; Firefox loads the same files from
 // manifest background.scripts instead.
 if (typeof importScripts === "function") {
-  importScripts("vendor/browser-polyfill.min.js", "consoles.js", "icon.js");
+  importScripts(
+    "vendor/browser-polyfill.min.js",
+    "time.js",
+    "entities.js",
+    "parsers/registry.js",
+    "parsers/defender.js",
+    "parsers/sentinel.js",
+    "consoles.js",
+    "icon.js",
+  );
 }
+
+const { localTimestamp } = globalThis.InspectorTime;
+const Parsers = globalThis.InspectorParsers;
 
 const HOST = "inspectors_notebook.relay";
 const RECONNECT_MS = 5000;
@@ -103,12 +115,79 @@ async function onTabUpdated(tabId, change, tab) {
     kind: "page_visit",
     source,
     seq: ++seq,
-    ts: new Date().toISOString(),
+    ts: localTimestamp(),
     console: console_.id,
     tabId,
     url: tab.url,
     title: tab.title,
+    incidentId: Parsers.incidentFromUrl(tab.url)?.incidentId ?? null,
   });
+  if (tab.active) screenshot(tab, "navigation");
+}
+
+// Queries and results from the page hook (FR-11, FR-12). Fields are copied one by one:
+// nothing else the page sends is passed on.
+const TIMESTAMP = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/;
+
+async function onCapture(payload, tab) {
+  const console_ = tab && consoleFor(tab.url);
+  if (!console_ || state.app !== "connected" || (await pausedTabs()).has(tab.id)) return;
+  const common = {
+    type: "event",
+    kind: payload.kind,
+    source,
+    seq: ++seq,
+    ts: TIMESTAMP.test(payload.ts) ? payload.ts : localTimestamp(),
+    console: console_.id,
+    tabId: tab.id,
+    url: tab.url,
+    queryId: String(payload.queryId),
+  };
+  if (payload.kind === "query") {
+    send({ ...common, language: String(payload.language), query: String(payload.query) });
+  } else if (payload.kind === "result") {
+    const { status, rowCount, columns, rows, truncated, entities } = payload;
+    send({ ...common, status, rowCount, columns, rows, truncated, entities });
+    screenshot(tab, "results");
+  }
+}
+
+// Screenshots (FR-13) while a case is recording: on navigation, tab switch and loaded
+// results. Browsers only let an extension capture tabs if it may read every website,
+// so the companion captures the browser window instead; it also skips unchanged pages.
+let lastRequestAt = 0;
+const REQUEST_GAP_MS = 500;
+
+async function screenshot(tab, trigger) {
+  try {
+    const console_ = consoleFor(tab?.url);
+    if (state.app !== "connected" || !state.recording || !tab.active || !console_) return;
+    if ((await pausedTabs()).has(tab.id)) return;
+    const wait = lastRequestAt + REQUEST_GAP_MS - Date.now();
+    lastRequestAt = Math.max(Date.now(), lastRequestAt + REQUEST_GAP_MS);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    send({
+      type: "screenshot_request",
+      source,
+      seq: ++seq,
+      ts: localTimestamp(),
+      console: console_.id,
+      tabId: tab.id,
+      url: tab.url,
+      title: tab.title,
+      trigger,
+    });
+  } catch {
+    // tab already gone
+  }
+}
+
+async function onTabActivated({ tabId }) {
+  try {
+    screenshot(await browser.tabs.get(tabId), "tab_switch");
+  } catch {
+    // tab already gone
+  }
 }
 
 async function setPaused(tabId, paused) {
@@ -121,12 +200,16 @@ async function setPaused(tabId, paused) {
 
 browser.tabs.onUpdated.addListener(onTabUpdated);
 browser.tabs.onCreated.addListener(reportTabs);
+browser.tabs.onActivated.addListener(onTabActivated);
 browser.tabs.onRemoved.addListener((tabId) => setPaused(tabId, false));
 
 // Popup
 
-browser.runtime.onMessage.addListener(async (message) => {
+browser.runtime.onMessage.addListener(async (message, sender) => {
   switch (message.type) {
+    case "capture":
+      await onCapture(message.payload ?? {}, sender.tab);
+      return true;
     case "popup_state": {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
       const console_ = tab ? consoleFor(tab.url) : null;
