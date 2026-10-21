@@ -63,3 +63,35 @@ jobs:
       - name: Browser test (Firefox)
         working-directory: extension
         run: npm run test:firefox
+
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Install Inno Setup if the runner image lacks it
+        run: |
+          $found = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ }
+          if (-not $found) { choco install innosetup --no-progress -y }
+
+      - name: Build the app folder and installer
+        run: powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+
+      - name: Install, run, upgrade and uninstall
+        run: uv run pytest -m installer -v
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer
+          path: dist/InspectorsNotebook-*-setup.exe
+          if-no-files-found: error
