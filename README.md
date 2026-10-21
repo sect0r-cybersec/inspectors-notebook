@@ -15,8 +15,6 @@ Inspector's Notebook records what you do in security consoles during an investig
 
 <p align="center">
   <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
-  <br>
-  <sub>Design of the live case view. The panel and browser connection are built; the case timeline is in progress.</sub>
 </p>
 
 > **Status:** early development. The docked panel and the browser connection work today. Case recording, the timeline, notes and export are next.
