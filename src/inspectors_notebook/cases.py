@@ -229,6 +229,8 @@ class CaseManager:
         if existing:  # FR-7: reopening a known incident resumes its case
             meta, events, marks = self._store.load(existing)
             meta["entities"] = list(dict.fromkeys(meta.get("entities", []) + list(entities)))
+            if title.strip() and not meta.get("title"):
+                meta["title"] = title.strip()
             self._case, self._events, self._marks = meta, events, marks
         else:
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")

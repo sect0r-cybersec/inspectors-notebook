@@ -258,3 +258,13 @@ def test_suggestions_and_dwell_follow_the_settings(store, clock):
     clock.advance(5)
     m.ingest(query("pivot"))
     assert m.summary()["suggestion"]["incidentId"] == "2"
+
+
+def test_resuming_an_untitled_case_takes_the_new_title(manager):
+    manager.start(incident_id="4821", console="defender")
+    manager.stop()
+    manager.start(incident_id="4821", console="defender", title="Driver loads")
+    assert manager.summary()["case"]["title"] == "Driver loads"
+    manager.stop()
+    manager.start(incident_id="4821", console="defender", title="Something else")
+    assert manager.summary()["case"]["title"] == "Driver loads"  # an existing title is kept
