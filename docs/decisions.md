@@ -4,6 +4,13 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ## 21 October 2026
 
+### S6 processing queue
+
+- **The queue is built before the model.** The labelling queue (newest first, one worker, 200-job cap, replaced jobs for changed events) is in place and tested with a stand-in model. The app runs without a labeller until S7, so nothing is labelled yet and the footer's "Labelling N events" only appears once the model is in.
+- **Repeated page captures merge by capture time** (FR-42): the same URL in the same tab within 2 s of the previous capture joins it. The time comes from the extension's timestamp, so events replayed from the pre-roll merge the same way. A newer title replaces the old one and is kept when the case is reopened.
+- **The panel refreshes at most five times a second** during a burst, instead of once per event. Before this, a burst of 1,000 events took 60 s to reach the panel, because each one waited for a full redraw; now it takes 2.5 s and the panel's UI thread answers within 4 ms throughout. The S6 exit test was "never freezes the panel"; this was the freeze.
+- **Order comes from arrival, per browser.** Each browser's events arrive in capture order over its own pipe connection and are stored in that order; sequence numbers and timestamps (FR-39) are already stamped by the extension.
+
 ### Installer
 
 - **PyInstaller in folder mode**, not Nuitka: no C compiler is needed and it handles pywebview's .NET and WebView2 parts. The app, the relay and the register tool share one folder and one Python runtime (NFR-9).
