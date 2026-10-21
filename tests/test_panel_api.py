@@ -35,7 +35,13 @@ def make_api(path, windows_light=False, **settings):
 
 def test_initial_state(path):
     api, _ = make_api(path)
-    assert api.get_state() == {"side": "right", "theme": "dark", "width": 400, "collapsed": False}
+    assert api.get_state() == {
+        "side": "right",
+        "theme": "dark",
+        "width": 400,
+        "collapsed": False,
+        "listener": {"browsers": 0, "tabs": 0},
+    }
 
 
 def test_toggle_side_docks_and_is_remembered(path):
@@ -101,3 +107,19 @@ def test_set_width_clamps_saves_and_docks(path):
     assert api.set_width(10)["width"] == MIN_WIDTH
     assert dock.applied[-1] == Layout("right", MIN_WIDTH, "appbar")
     assert store.load(path).width == MIN_WIDTH
+
+
+def test_listener_state_is_reported(path):
+    api, _ = make_api(path)
+    api._set_listener({"browsers": 2, "tabs": 5})
+    assert api.get_state()["listener"] == {"browsers": 2, "tabs": 5}
+
+
+def test_expand_only_redocks_when_collapsed(path):
+    api, dock = make_api(path)
+    api._expand()
+    assert dock.applied == []
+    api.toggle_collapse()
+    api._expand()
+    assert api.get_state()["collapsed"] is False
+    assert dock.applied[-1] == Layout("right", 400, "appbar")

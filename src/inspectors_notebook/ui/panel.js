@@ -4,6 +4,7 @@ const root = document.documentElement;
 const panel = document.querySelector(".panel");
 const rail = document.querySelector(".rail");
 const handle = document.querySelector(".resize");
+const listener = document.querySelector(".listener");
 const KEY_STEP = 16;
 
 let state = null;
@@ -12,6 +13,7 @@ function api() {
   return window.pywebview.api;
 }
 
+// Python also calls this when a browser connects or reports its console tabs.
 function render(next) {
   state = next;
   root.dataset.theme = state.theme;
@@ -19,6 +21,7 @@ function render(next) {
   panel.hidden = state.collapsed;
   rail.hidden = !state.collapsed;
   handle.setAttribute("aria-valuenow", state.width);
+  listener.textContent = listenerText(state.listener);
 
   const labels = {
     theme: state.theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
@@ -29,6 +32,12 @@ function render(next) {
     button.setAttribute("aria-label", label);
     button.title = label;
   }
+}
+
+function listenerText({ browsers, tabs }) {
+  if (browsers === 0) return "No browsers connected";
+  if (tabs === 0) return "Extension connected, no console tabs open";
+  return `Extension listening in ${tabs} ${tabs === 1 ? "tab" : "tabs"}`;
 }
 
 const actions = {

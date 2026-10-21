@@ -1,13 +1,16 @@
 """Companion app entry point: a docked pywebview panel."""
 
 import atexit
+import json
 import logging
+import threading
 from importlib import resources
 
 import webview
 
+from . import pipe, win32
 from . import settings as settings_store
-from . import win32
+from .bridge import Bridge
 from .dock import Dock
 from .geometry import RAIL_WIDTH, Layout
 from .panel import PanelApi
@@ -32,8 +35,26 @@ def load_page(theme: str) -> str:
     return page.replace('data-theme="dark"', f'data-theme="{theme}"', 1)
 
 
+def show_running_instance(name: str) -> None:
+    try:
+        conn = pipe.connect(name, timeout_ms=2000)
+        conn.send({"type": "show"})
+        conn.close()
+    except pipe.PipeError as e:
+        log.warning("Inspector is already running but did not answer: %s", e)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    # One companion per user: a second launch just brings the first one forward.
+    server = pipe.Server(pipe.default_pipe_name())
+    try:
+        server.listen()
+    except pipe.AlreadyRunning:
+        show_running_instance(server.name)
+        return
+
     win32.enable_per_monitor_dpi()
 
     path = settings_store.default_path()
@@ -58,16 +79,39 @@ def main() -> None:
         background_color=BACKGROUNDS[theme],
     )
 
+    loaded = threading.Event()
+
+    def push_state() -> None:
+        if loaded.is_set():
+            window.evaluate_js(f"render({json.dumps(api.get_state())})")
+
+    def on_listener(listener: dict) -> None:
+        api._set_listener(listener)
+        push_state()
+
+    def on_show() -> None:
+        api._expand()
+        window.show()
+        push_state()
+
+    bridge = Bridge(server, on_listener, on_show)
+
     def dock_and_show() -> None:
         window.events.loaded -= dock_and_show
         hwnd = window.native.Handle.ToInt64()
         dock.start(hwnd, Layout(settings.side, settings.width, settings.dock), theme)
         dock.flush()
         window.show()
+        loaded.set()
+        bridge.start()
+
+    def shut_down() -> None:
+        bridge.stop()
+        dock.stop()
 
     window.events.loaded += dock_and_show
-    window.events.closed += dock.stop
-    atexit.register(dock.stop)
+    window.events.closed += shut_down
+    atexit.register(shut_down)
     webview.start(gui="edgechromium")
 
 
