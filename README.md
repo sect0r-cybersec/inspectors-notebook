@@ -17,7 +17,7 @@ Inspector's Notebook records what you do in security consoles during an investig
   <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
 </p>
 
-> **Status:** early development. The docked panel and the browser connection work today. Case recording, the timeline, notes and export are next.
+> **Status:** early development. The docked panel and the browser connection work today, and the capture framework is in place. Defender XDR and Sentinel query capture is waiting on lab captures; case recording, the timeline, notes and export follow.
 
 ## Features
 
@@ -77,15 +77,17 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 
 - [Window behaviour checklist](tests/manual/S1-window-checklist.md): docking, multiple monitors, mixed scaling and sleep.
 - [Relay and extension checklist](tests/manual/S2-relay-checklist.md): the browser connection end to end.
+- [Lab capture guide](tests/manual/S3-lab-capture-guide.md): what to capture in the lab to finish the console parsers.
 
 ## For developers
 
-The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete.
+The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) has its framework built and needs lab captures for the console rules.
 
 | Path | What it holds |
 | --- | --- |
 | `src/inspectors_notebook/` | Companion app: panel, AppBar docking, pipe, relay, browser registration |
 | `extension/src/` | Listener extension, one Manifest V3 codebase for all three browsers |
+| `extension/src/parsers/` | One versioned module per console |
 | `tests/` | Python unit and integration tests, plus manual checklists |
 | `extension/tests/` | Browser round-trip tests |
 
@@ -93,8 +95,9 @@ Run the tests:
 
 ```bash
 uv run pytest                  # unit and pipe tests
-uv run pytest -m desktop       # real docking; rearranges open windows while it runs
+uv run pytest -m desktop       # real docking and window capture; uses the desktop while it runs
 cd extension
+npm run test:unit              # parser framework, request hook, entities
 npm test                       # Chrome and Edge
 npm run test:firefox           # Firefox
 npm run lint                   # web-ext lint
