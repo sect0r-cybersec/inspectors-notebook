@@ -2,10 +2,11 @@
 
 // Console parsers (FR-16): one isolated, versioned module per console, registered here.
 // A parser declares the console's origins, how to find an incident ID in a page URL
-// (FR-2), and which outgoing requests carry a submitted query and how to read the query,
-// its results and any error from them (FR-12). Origins may use a leading wildcard for
-// frames, such as https://*.example.net. Loaded in the page (for the request hook) and
-// in the background script.
+// (FR-2), optionally which URL parameter names the tenant (FR-14) and which pages are
+// navigation only (FR-18), and which outgoing requests carry a submitted query and how
+// to read the query, its results and any error from them (FR-12). Origins may use a
+// leading wildcard for frames, such as https://*.example.net. Loaded in the page (for
+// the request hook) and in the background script.
 (() => {
   const MAX_ROWS = 5000; // full results stay in the case (S4); this caps one message
 
@@ -42,6 +43,27 @@
       return null;
     }
     return parsers.find((p) => p.origins.some((o) => originMatches(o, origin))) ?? null;
+  }
+
+  // Navigation-only pages (lists, home, settings) are hidden during a case (FR-18).
+  function isNavigationOnly(url) {
+    const parser = parserFor(url);
+    try {
+      const { pathname } = new URL(url);
+      return (parser?.navigationOnly ?? []).some((pattern) => pattern.test(pathname));
+    } catch {
+      return false;
+    }
+  }
+
+  function tenantFromUrl(url) {
+    const parser = parserFor(url);
+    if (!parser?.tenantParam) return null;
+    try {
+      return new URL(url).searchParams.get(parser.tenantParam) || null;
+    } catch {
+      return null;
+    }
   }
 
   function incidentFromUrl(url) {
@@ -130,6 +152,8 @@
     registerParser,
     parserFor,
     incidentFromUrl,
+    isNavigationOnly,
+    tenantFromUrl,
     matchQueryRequest,
     readQuery,
     readResults,

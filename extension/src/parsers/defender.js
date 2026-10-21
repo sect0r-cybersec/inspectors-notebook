@@ -8,9 +8,12 @@
 globalThis.InspectorParsers.registerParser({
   id: "defender",
   name: "Defender XDR",
-  version: "0.2.0",
+  version: "0.3.0",
   origins: ["https://security.microsoft.com"],
   incidentUrls: [],
+  // Lab URLs carry the tenant ID as ?tid=, and /alerts and /incidents are list pages.
+  tenantParam: "tid",
+  navigationOnly: [/^\/(alerts|incidents)\/?$/],
   queryRequests: [
     {
       // Advanced hunting: the KQL is in QueryText; columns are in Schema and each row
