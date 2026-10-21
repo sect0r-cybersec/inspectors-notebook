@@ -140,6 +140,9 @@ GetDpiForMonitor = _sig(
     wintypes.HMONITOR, ctypes.c_int, ctypes.POINTER(wintypes.UINT), ctypes.POINTER(wintypes.UINT),
 )  # fmt: skip
 SetProcessDpiAwarenessContext = _sig(user32.SetProcessDpiAwarenessContext, wintypes.BOOL, wintypes.HANDLE)
+DwmGetWindowAttribute = _sig(
+    dwmapi.DwmGetWindowAttribute, ctypes.HRESULT, wintypes.HWND, wintypes.DWORD, wintypes.LPVOID, wintypes.DWORD
+)
 DwmSetWindowAttribute = _sig(
     dwmapi.DwmSetWindowAttribute, ctypes.HRESULT, wintypes.HWND, wintypes.DWORD, wintypes.LPCVOID, wintypes.DWORD
 )
