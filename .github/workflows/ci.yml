@@ -1,0 +1,65 @@
+# Runs every automated test on a Windows runner, on each push and pull request.
+# Actions are pinned to commits; the comment beside each gives its release.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install Python dependencies
+        run: uv sync --locked
+
+      - name: Python unit and pipe tests
+        run: uv run pytest
+
+      - name: Desktop tests (real docking and window capture)
+        run: uv run pytest -m desktop
+
+      - name: Install extension dependencies
+        working-directory: extension
+        run: npm ci
+
+      - name: Extension unit and fixture tests
+        working-directory: extension
+        run: npm run test:unit
+
+      - name: Lint extension
+        working-directory: extension
+        run: npm run lint
+
+      - name: Register the relay with the browsers
+        run: uv run inspectors-notebook-register install
+
+      - name: Browser tests (Chrome and Edge)
+        working-directory: extension
+        run: npm test
+
+      - name: Browser test (Firefox)
+        working-directory: extension
+        run: npm run test:firefox
