@@ -17,7 +17,7 @@ Inspector's Notebook records what you do in security consoles during an investig
   <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
 </p>
 
-> **Status:** early development. Phase 1 is built: the docked panel, the browser connection, Defender XDR and Sentinel query capture, cases, the timeline, notes and export. The Windows installer and the local decision model come next.
+> **Status:** early development. Phase 1 is built: the docked panel, the browser connection, Defender XDR and Sentinel query capture, cases, the timeline, notes and export. A per-user Windows installer is built and tested in CI. The local decision model comes next.
 
 ## Features
 
@@ -38,12 +38,21 @@ Inspector's Notebook records what you do in security consoles during an investig
 
 **Planned**
 
-- A Windows installer, so Python is not needed.
 - A local decision model that labels events, highlights findings and decides borderline events.
 
 ## Quick start
 
-You need Windows 10 or 11, [uv](https://docs.astral.sh/uv/) and [Node.js](https://nodejs.org/). There is no installer yet, so install from source. From the repository folder:
+### With the installer
+
+You need Windows 10 (1809 or later) or 11. There is no published release yet: take `InspectorsNotebook-<version>-setup.exe` from the `installer` artifact of a CI run, or build it yourself (see [For developers](#for-developers)).
+
+Run it. It installs for your Windows account only, so it needs no admin rights, and registers the relay with Chrome, Edge and Firefox. The installer is not code-signed yet, so SmartScreen warns on first run: choose **More info**, then **Run anyway**. Then load the extension as described below, and start Inspector from the Start menu or the extension's popup.
+
+Uninstall from **Settings, Apps**. It asks before deleting your saved cases and settings.
+
+### From source
+
+You also need [uv](https://docs.astral.sh/uv/) and [Node.js](https://nodejs.org/). From the repository folder:
 
 ```bash
 uv sync
@@ -53,7 +62,9 @@ cd extension && npm install
 
 The second command lets Chrome, Edge and Firefox start the app's relay. It writes to your user registry only, so no admin rights are needed.
 
-Then load the extension from `extension/src`:
+### Loading the extension
+
+Until the extension is in the browser stores, load it from `extension/src`:
 
 - **Chrome or Edge:** open `chrome://extensions` or `edge://extensions`, turn on Developer mode, choose **Load unpacked** and pick `extension/src`.
 - **Firefox:** open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on** and pick `extension/src/manifest.json`. Firefox removes temporary add-ons when it restarts.
@@ -62,15 +73,9 @@ Restart any browser that was already open.
 
 ## Usage
 
-Start the panel:
+Start the panel from the Start menu, with `uv run inspectors-notebook` from source, or click **Open Inspector** in the extension's toolbar popup. The panel docks to the screen edge and its status strip shows what the extension can see, for example `Extension listening in 2 tabs`. Close the panel from the taskbar or with Alt+F4.
 
-```bash
-uv run inspectors-notebook
-```
-
-or click **Open Inspector** in the extension's toolbar popup. The panel docks to the screen edge and its status strip shows what the extension can see, for example `Extension listening in 2 tabs`. Close the panel from the taskbar or with Alt+F4.
-
-To remove the browser registration:
+To remove the browser registration of a from-source install:
 
 ```bash
 uv run inspectors-notebook-register uninstall
@@ -85,17 +90,19 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 - [Lab capture guide](tests/manual/S3-lab-capture-guide.md): what to capture in the lab to finish the console parsers.
 - [Cases checklist](tests/manual/S4-case-checklist.md): starting, pausing and stopping cases in the real app.
 - [Timeline and export checklist](tests/manual/S5-timeline-export-checklist.md): the timeline, exports, the case cache, settings and shortcuts.
+- [Installer checklist](tests/manual/installer-checklist.md): installing, upgrading and uninstalling on fresh Windows 10 and 11 machines.
 - [Decisions](docs/decisions.md): where the build departs from the original requirements, and why.
 
 ## For developers
 
-The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) and stage 5 (timeline, export, case cache, settings) are built. Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
+The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) and stage 5 (timeline, export, case cache, settings) are built, followed by the installer. Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
 
 | Path | What it holds |
 | --- | --- |
 | `src/inspectors_notebook/` | Companion app: panel, AppBar docking, pipe, relay, browser registration |
 | `extension/src/` | Listener extension, one Manifest V3 codebase for all three browsers |
 | `extension/src/parsers/` | One versioned module per console |
+| `packaging/` | PyInstaller build, Inno Setup script and the build script |
 | `tests/` | Python unit and integration tests, plus manual checklists |
 | `extension/tests/` | Browser round-trip tests |
 
@@ -104,12 +111,21 @@ Run the tests:
 ```bash
 uv run pytest                  # unit and pipe tests
 uv run pytest -m desktop       # real docking and window capture; uses the desktop while it runs
+uv run pytest -m installer     # installs the built installer for you, then uninstalls it
 cd extension
 npm run test:unit              # parser framework, request hook, entities
 npm test                       # Chrome and Edge
 npm run test:firefox           # Firefox
 npm run lint                   # web-ext lint
 ```
+
+Build the installer with Inno Setup 6 installed (`winget install JRSoftware.InnoSetup`):
+
+```bash
+powershell -ExecutionPolicy Bypass -File packaging/build.ps1
+```
+
+It writes the app folder to `dist/InspectorsNotebook` and the installer next to it. The installer tests put your own browser registration and Start with Windows entry back when they finish.
 
 The browser tests need the relay registered and the app closed. They serve console pages locally, so they never reach the real consoles.
 

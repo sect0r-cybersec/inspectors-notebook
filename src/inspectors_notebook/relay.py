@@ -15,10 +15,9 @@ import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import BinaryIO, Callable
 
-from . import pipe
+from . import autostart, pipe
 
 log = logging.getLogger(__name__)
 
@@ -176,8 +175,7 @@ class Relay:
 
 def launch_companion() -> None:
     """Start the companion without a console window, outside the browser's job object."""
-    scripts = Path(sys.executable).parent
-    cmd = [str(scripts / "pythonw.exe"), "-m", "inspectors_notebook"]
+    cmd = autostart.companion_command()
     flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     try:
         # Browsers may run the host in a job that is killed when the browser closes.

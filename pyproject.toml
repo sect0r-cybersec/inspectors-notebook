@@ -22,12 +22,14 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "pyinstaller>=6.22.3",
     "pytest>=9.1.1",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not desktop'"
+addopts = "-m 'not desktop and not installer'"
 markers = [
     "desktop: docks real windows against the Windows shell; rearranges the desktop while running",
+    "installer: installs the built installer for this user; build it first with packaging/build.ps1",
 ]
