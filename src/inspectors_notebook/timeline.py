@@ -42,6 +42,7 @@ class Item:
     star: bool = False
     annotation: str = ""
     pinned: bool = False
+    unlabelled: bool = False  # dropped from the labelling queue (FR-43)
     file: str = ""
     trigger: str = ""
     extra: dict = field(default_factory=dict)
@@ -175,6 +176,7 @@ def build(events: list[dict], decisions: list[Decision], marks: dict[int, dict])
         item.star = bool(first.get("star"))
         item.annotation = first.get("annotation", "")
         item.pinned = bool(first.get("pin"))
+        item.unlabelled = any(marks.get(i, {}).get("unlabelled") for i in item.ids)
     return items
 
 
@@ -207,6 +209,7 @@ def view(item: Item, entities: list[str], tz: tzinfo | None = None, utc: bool = 
         "ids": item.ids, "kind": item.kind, "time": clock(item.ts, tz, utc), "label": item.label, "text": item.text,
         "code": item.code, "disposition": item.disposition, "reason": item.reason, "flags": list(item.flags),
         "star": item.star, "annotation": item.annotation, "pinned": item.pinned, "trigger": item.trigger,
+        "unlabelled": item.unlabelled,
     }
     if item.result:
         out["summary"] = summary_line(item.result, entities, tz, utc)
