@@ -4,6 +4,17 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ## 21 October 2026
 
+### Installer
+
+- **PyInstaller in folder mode**, not Nuitka: no C compiler is needed and it handles pywebview's .NET and WebView2 parts. The app, the relay and the register tool share one folder and one Python runtime (NFR-9).
+- **Per user, no admin rights.** Inno Setup installs to `%LOCALAPPDATA%\Programs\InspectorsNotebook` with no UAC prompt, matching NFR-5 and the per-user browser registration. It needs Windows 10 1809 or later, the oldest release WebView2 supports.
+- **Install registers the relay; uninstall removes the registration** and the Start with Windows entry. Upgrades close a running app and relay first.
+- **Uninstalling asks before deleting cases and settings**, defaulting to keep. A silent uninstall keeps them.
+- **Not code-signed yet.** There is no certificate, so Windows SmartScreen warns on first run and some EDR tools may block it. NFR-12 still applies before the first public release.
+- **No model in the installer**: there is no model until S7, so first-run model download (NFR-9) comes with it.
+- **Installer wording is Inno Setup's built-in English.** It has no British English translation; the strings shown on its pages use no American spellings.
+- **Not tested on fresh Windows 10 and 11 virtual machines yet.** CI installs, runs, upgrades and uninstalls on a Windows Server runner; the fresh-VM check is in the installer checklist.
+
 ### S5 choices
 
 - **Global shortcuts use Ctrl+Alt**: Ctrl+Alt+N adds a note, Ctrl+Alt+S starts or pauses recording, Ctrl+Alt+I shows or collapses the panel. The spec's Ctrl+Shift+N would take over Chrome's incognito window, Edge's InPrivate window and Firefox's reopen-closed-window while Inspector runs. Ctrl+Alt+R was planned for recording but another program held it on the development machine. A shortcut another program holds is reported in Settings rather than silently lost. Changes FR-25 and FR-53.
