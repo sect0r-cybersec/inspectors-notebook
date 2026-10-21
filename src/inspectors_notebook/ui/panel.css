@@ -316,6 +316,7 @@ input:focus-visible, textarea:focus-visible { outline: 2px solid var(--logo); ou
 .decide { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .decide .outline { height: 30px; font-size: 12px; }
 
+.labelling { margin: 0; padding: 6px 16px 0; color: var(--muted); font-size: 12px; }
 .case-footer { padding: 10px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
 .note-form { flex: 1; }
 .note-form input {

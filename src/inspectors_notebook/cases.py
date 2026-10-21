@@ -4,6 +4,9 @@ One case records at a time. Every captured event goes into an in-memory pre-roll
 buffer (never written to disk); during a case it is also stored with the rules'
 decision. Start detection suggests a case after the analyst dwells on an incident page
 and then pivots; it needs the console parsers' incident URL patterns to fire.
+
+Recorded events are queued for labelling in the background (FR-41 to FR-43) when a
+labeller is given; the model that labels them comes in S7.
 """
 
 import re
@@ -16,12 +19,16 @@ from typing import Callable
 
 from . import cache, rules
 from .case_store import CaseStore
+from .labelling import LabelQueue
 from .rules import KEEP, CaseContext, Decision
 from .settings import Settings
+from .timeline import parse_time
 
 PREROLL_SECONDS = Settings().preroll_minutes * 60  # FR-6 default; the setting wins
 DWELL_SECONDS = Settings().dwell_seconds  # FR-3 default; the setting wins
 IDLE_SECONDS = 300  # FR-18: events captured after this long without input are hidden
+MERGE_SECONDS = 2  # FR-42: the same page captured again within this long is one event
+LABELLED_KINDS = ("page_visit", "query", "result")  # what the model jobs ask about
 
 
 def local_now() -> str:
@@ -41,6 +48,7 @@ class CaseManager:
         idle_seconds: Callable[[], float] = lambda: 0.0,
         now: Callable[[], str] = local_now,
         settings: Callable[[], Settings] = Settings,
+        labeller: Callable[[dict], dict] | None = None,
     ):
         self._store = store
         self._on_change = on_change
@@ -62,6 +70,16 @@ class CaseManager:
         self._dwell: dict | None = None
         self._suggestion: dict | None = None
         self._dismissed: set[tuple] = set()
+        self._last_page: dict[tuple, tuple[int, str]] = {}  # (source, tab) to (event id, ts)
+        self._queue = LabelQueue(labeller, self._labelled, self._label_failed) if labeller else None
+        if self._queue:
+            self._queue.start()
+
+    def close(self) -> None:
+        """Stop the case and the labelling worker, when the app exits."""
+        self.stop()
+        if self._queue:
+            self._queue.stop()
 
     # State
 
@@ -84,6 +102,7 @@ class CaseManager:
                     "elapsedSeconds": int(elapsed),
                     "counts": counts,
                     "suggestedEntities": rules.suggested_entities(self._events, self._decisions, self._case["entities"])[:6],
+                    "labelling": self._queue.depth if self._queue else 0,  # FR-44
                 }
             return {"case": case, "suggestion": self._suggestion}
 
@@ -128,6 +147,8 @@ class CaseManager:
         return True
 
     def _record(self, item: dict) -> None:
+        if self._merge_repeat(item):
+            return
         item = {**item, "id": len(self._events) + 1}
         if self._case.get("tenant") is None and item.get("tenant"):
             self._case["tenant"] = self._context.tenant = item["tenant"]
@@ -138,6 +159,75 @@ class CaseManager:
         self._store.append_event(self._case["id"], item)
         self._case["lastActivity"] = item.get("ts") or self._now()
         self._store.save_meta(self._case)
+        if item.get("kind") == "page_visit":
+            self._last_page[(item.get("source"), item.get("tabId"))] = (item["id"], item.get("ts"))
+        self._submit(item["id"])
+
+    def _merge_repeat(self, item: dict) -> bool:
+        """The same page captured again within 2 s joins the first capture (FR-42).
+
+        A newer title replaces the old one, and the event is queued again, which cancels
+        its pending labelling job.
+        """
+        if item.get("kind") != "page_visit":
+            return False
+        key = (item.get("source"), item.get("tabId"))
+        last = self._last_page.get(key)
+        if not last:
+            return False
+        event_id, last_ts = last
+        earlier, later = parse_time(last_ts), parse_time(item.get("ts"))
+        event = self._events[event_id - 1]
+        if event.get("url") != item.get("url") or not earlier or not later:
+            return False
+        if not 0 <= (later - earlier).total_seconds() <= MERGE_SECONDS:
+            return False
+        self._last_page[key] = (event_id, item.get("ts"))
+        title = item.get("title")
+        if title and title != event.get("title"):
+            event["title"] = title
+            self._marks.setdefault(event_id, {})["title"] = title
+            self._store.append_action(self._case["id"], event_id, "title", title)
+            self._rerun()  # the new title may name a case entity
+            self._submit(event_id)
+        return True
+
+    # Labelling (FR-41 to FR-44)
+
+    def _submit(self, event_id: int) -> None:
+        item = self._events[event_id - 1]
+        if not self._queue or item.get("kind") not in LABELLED_KINDS:
+            return
+        job = {
+            "caseId": self._case["id"],
+            "case": {"title": self._case.get("title"), "entities": list(self._case["entities"])},
+            "event": {k: v for k, v in item.items() if k != "idle"},
+        }
+        for dropped in self._queue.submit(event_id, job):
+            self._set_label_mark(dropped, "unlabelled", True)  # FR-43: kept, never labelled
+
+    def _labelled(self, event_id: int, job: dict, labels: dict) -> None:
+        with self._lock:
+            if not self._case or job["caseId"] != self._case["id"]:
+                return
+            self._set_label_mark(event_id, "labels", labels)
+        self._on_change()
+
+    def _label_failed(self, event_id: int, job: dict) -> None:
+        with self._lock:
+            if not self._case or job["caseId"] != self._case["id"]:
+                return
+            self._set_label_mark(event_id, "unlabelled", True)
+        self._on_change()
+
+    def _set_label_mark(self, event_id: int, field: str, value) -> None:
+        marks = self._marks.setdefault(event_id, {})
+        marks[field] = value
+        self._store.append_action(self._case["id"], event_id, field, value)
+        other = "unlabelled" if field == "labels" else "labels"
+        if other in marks:
+            del marks[other]
+            self._store.append_action(self._case["id"], event_id, other, None)
 
     def _disposition(self, event_id: int) -> str | None:
         return self._marks.get(event_id, {}).get("disposition")
@@ -228,6 +318,9 @@ class CaseManager:
         existing = case_id or (self._store.find_by_incident(console, incident_id) if incident_id else None)
         if existing:  # FR-7: reopening a known incident resumes its case
             meta, events, marks = self._store.load(existing)
+            for event_id, event_marks in marks.items():  # titles updated by merged repeats
+                if "title" in event_marks and 1 <= event_id <= len(events):
+                    events[event_id - 1]["title"] = event_marks["title"]
             meta["entities"] = list(dict.fromkeys(meta.get("entities", []) + list(entities)))
             if title.strip() and not meta.get("title"):
                 meta["title"] = title.strip()
@@ -255,6 +348,7 @@ class CaseManager:
             self._events, self._marks = [], {}
             self._enforce_cache()
         self._rerun()
+        self._last_page = {}
         self._suggestion = None
         self._dwell = None
         self._paused = False
@@ -372,6 +466,9 @@ class CaseManager:
         self._case["lastActivity"] = self._now()
         self._store.save_meta(self._case)
         self._case, self._events, self._decisions, self._marks = None, [], [], {}
+        self._last_page = {}
+        if self._queue:
+            self._queue.clear()
         self._context = CaseContext()
         self._paused, self._running_since, self._elapsed = False, None, 0.0
         self._suggestion = None

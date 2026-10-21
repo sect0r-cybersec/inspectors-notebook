@@ -268,3 +268,21 @@ def test_resuming_an_untitled_case_takes_the_new_title(manager):
     manager.stop()
     manager.start(incident_id="4821", console="defender", title="Something else")
     assert manager.summary()["case"]["title"] == "Driver loads"  # an existing title is kept
+
+
+def test_the_same_page_captured_again_within_two_seconds_is_one_event(manager, store):  # FR-42
+    case_id = manager.start(title="Merge")
+    url = "https://security.microsoft.com/incidents/1"
+    manager.ingest(visit(url, source="s", tabId=1, ts="2026-10-21T14:00:00.000+01:00", title="Microsoft Defender"))
+    manager.ingest(visit(url, source="s", tabId=1, ts="2026-10-21T14:00:01.500+01:00", title="Incident 1 - Phish"))
+    manager.ingest(visit(url, source="s", tabId=1, ts="2026-10-21T14:00:03.000+01:00", title="Incident 1 - Phish"))
+    assert [e["title"] for e, _ in manager.events()] == ["Incident 1 - Phish"]  # each repeat within 2 s of the last
+
+    manager.ingest(visit(url, source="s", tabId=2, ts="2026-10-21T14:00:03.100+01:00"))  # another tab
+    manager.ingest(visit(url, source="s", tabId=1, ts="2026-10-21T14:00:06.000+01:00"))  # 3 s later
+    manager.ingest(visit(url + "?tab=alerts", source="s", tabId=1, ts="2026-10-21T14:00:06.500+01:00"))
+    assert len(manager.events()) == 4
+
+    manager.stop()
+    manager.open_case(case_id)  # the newer title survives a reload
+    assert manager.events()[0][0]["title"] == "Incident 1 - Phish"

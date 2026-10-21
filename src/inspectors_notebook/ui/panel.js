@@ -307,6 +307,7 @@ function renderItem(item) {
   head.append(el("span", "time", item.time), el("span", "tag", item.label));
   const reason = REASONS[item.reason] || (item.negative ? REASONS.negative_finding : "");
   if (reason) head.append(el("span", "reason", reason));
+  if (item.unlabelled) head.append(el("span", "reason", "Not labelled"));
 
   const act = (fn) => async () => render(await fn());
   const actions = el("span", "item-actions");
@@ -381,6 +382,9 @@ function renderTabs() {
 function renderTimelineArea() {
   const c = state.case;
   for (const sel of [".tabs", ".timeline", ".case-footer"]) $(sel).hidden = !c;
+  const depth = c?.labelling || 0;
+  $(".labelling").hidden = !depth;
+  $(".labelling").textContent = depth === 1 ? "Labelling 1 event" : `Labelling ${depth} events`;
   if (!c) {
     $(".tab-help").hidden = true;
     if (view === "export") setView("case");
