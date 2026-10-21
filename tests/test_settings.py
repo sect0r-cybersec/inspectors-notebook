@@ -34,6 +34,12 @@ def test_invalid_fields_fall_back_one_by_one(tmp_path):
     assert store.load(path) == Settings(theme="light")
 
 
+def test_file_with_bom_is_read(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"side": "left"}), encoding="utf-8-sig")
+    assert store.load(path).side == "left"
+
+
 def test_width_is_clamped_on_load(tmp_path):
     path = tmp_path / "settings.json"
     path.write_text(json.dumps({"width": 5000}), encoding="utf-8")

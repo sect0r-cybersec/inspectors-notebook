@@ -33,7 +33,7 @@ def default_path() -> Path:
 def load(path: Path) -> Settings:
     """Read settings, falling back to the default for anything missing or invalid."""
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))  # tolerate a BOM from hand edits
     except FileNotFoundError:
         return Settings()
     except (OSError, ValueError) as e:
