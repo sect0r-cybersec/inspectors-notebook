@@ -24,6 +24,17 @@ Run the app with `uv run inspectors-notebook`, with the extension loaded and you
 - [ ] Removing an entity chip changes the counts back where it mattered.
 - [ ] Screenshots appear in the case's `screenshots` folder while recording, and none while paused or idle.
 
-## Not testable yet
+## Start detection
 
-Start suggestions ("Incident detected"), switching incidents mid-case, and incident IDs from URLs need the incident URL patterns from a lab incident (see `tests/manual/S3-lab-capture-guide.md`). The logic is covered by `tests/test_cases.py` and `tests/test_investigation.py`.
+Incident pages are recognised from the URL on any site (see `docs/decisions.md`).
+
+- [ ] Open a lab incident or alert page, stay 30 seconds, then run a query or open another page: "Incident detected" appears with Start case and Not now.
+- [ ] Not now: the same incident does not prompt again.
+- [ ] With a case running, opening a different incident offers Switch case, Pause or Keep going.
+- [ ] Starting a case from the prompt pulls in the incident page and anything after it from the last three minutes.
+
+## Other sites
+
+- [ ] On a site that is not listened to (your ticketing system, say), the popup shows "not listening" and **Listen on this site**. Clicking it shows the browser's permission prompt for that site only.
+- [ ] After allowing, the popup says "listening", page visits reach a running case, and an incident or ticket page there can trigger "Incident detected".
+- [ ] **Stop listening on this site** removes it, and the browser no longer lists the permission.
