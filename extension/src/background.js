@@ -120,7 +120,9 @@ async function onTabUpdated(tabId, change, tab) {
     tabId,
     url: tab.url,
     title: tab.title,
+    tenant: Parsers.tenantFromUrl(tab.url),
     incidentId: Parsers.incidentFromUrl(tab.url)?.incidentId ?? null,
+    navigationOnly: Parsers.isNavigationOnly(tab.url),
   });
   if (tab.active) screenshot(tab, "navigation");
 }
@@ -141,6 +143,7 @@ async function onCapture(payload, tab) {
     console: console_.id,
     tabId: tab.id,
     url: tab.url,
+    tenant: Parsers.tenantFromUrl(tab.url),
     queryId: String(payload.queryId),
   };
   if (payload.kind === "query") {

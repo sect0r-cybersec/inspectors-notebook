@@ -191,6 +191,22 @@ def style_window_frame(hwnd: int, border_hex: str) -> None:
     DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ctypes.byref(colour), ctypes.sizeof(colour))
 
 
+class LASTINPUTINFO(ctypes.Structure):
+    _fields_ = [("cbSize", wintypes.UINT), ("dwTime", wintypes.DWORD)]
+
+
+GetLastInputInfo = _sig(user32.GetLastInputInfo, wintypes.BOOL, ctypes.POINTER(LASTINPUTINFO))
+GetTickCount = _sig(kernel32.GetTickCount, wintypes.DWORD)
+
+
+def idle_seconds() -> float:
+    """Seconds since the user last pressed a key or moved the mouse."""
+    info = LASTINPUTINFO(cbSize=ctypes.sizeof(LASTINPUTINFO))
+    if not GetLastInputInfo(ctypes.byref(info)):
+        return 0.0
+    return ((GetTickCount() - info.dwTime) & 0xFFFFFFFF) / 1000  # tick counts wrap every 49.7 days
+
+
 def windows_uses_light_theme() -> bool:
     try:
         with winreg.OpenKey(

@@ -32,11 +32,57 @@
 
   <div class="status">
     <span class="idle-dot" aria-hidden="true"></span><span>Not recording</span><span aria-hidden="true">·</span><span class="listener" role="status">No browsers connected</span>
+    <button class="outline small push-right" data-case="open_form">Start manually</button>
   </div>
+
+  <div class="recording" hidden>
+    <span class="rec-dot" aria-hidden="true"></span><span class="rec-label">Recording</span><span class="rec-timer mono" role="timer">00:00</span>
+    <div class="push-right rec-actions">
+      <button class="rec-btn" data-case="pause_or_resume">
+        <svg class="when-recording" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"></path></svg>
+        <svg class="when-paused" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"></path></svg>
+        <span class="pause-label">Pause</span>
+      </button>
+      <button class="rec-btn" data-case="stop"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>Stop</button>
+    </div>
+  </div>
+
+  <section class="suggestion" aria-live="polite" hidden>
+    <div class="suggestion-kicker"></div>
+    <h2 class="suggestion-title"></h2>
+    <div class="suggestion-meta mono"></div>
+    <div class="suggestion-actions">
+      <button class="primary grow" data-case="accept_suggestion"></button>
+      <button class="outline" data-case="pause" hidden>Pause</button>
+      <button class="outline" data-case="dismiss_suggestion"></button>
+    </div>
+  </section>
+
+  <section class="case-header" hidden>
+    <div class="case-meta"></div>
+    <h1 class="case-title"></h1>
+    <div class="chips case-entities"></div>
+    <div class="counts"></div>
+    <div class="seen" hidden>
+      <span class="label">Seen in results</span>
+      <div class="chips seen-entities"></div>
+    </div>
+  </section>
+
+  <form class="start-form" hidden>
+    <h1>Start a case</h1>
+    <label>Incident ID <span class="faint">(optional)</span><input name="incidentId" class="mono" autocomplete="off"></label>
+    <label>Title<input name="title" autocomplete="off"></label>
+    <label>Entities <span class="faint">(one per line or comma separated)</span><textarea name="entities" rows="3" class="mono"></textarea></label>
+    <div class="form-actions">
+      <button type="submit" class="primary grow">Start case</button>
+      <button type="button" class="outline" data-case="close_form">Cancel</button>
+    </div>
+  </form>
 
   <main class="empty">
     <h1>No case running</h1>
-    <p>Open an incident in a connected console and Inspector will offer to start a case.</p>
+    <p>Open an incident in a connected console and Inspector will offer to start a case, or start one manually.</p>
   </main>
 </section>
 
@@ -45,6 +91,7 @@
     <svg class="flip" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 7l-5 5 5 5M11 7l-5 5 5 5"></path></svg>
   </button>
   <div class="rail-divider"></div>
+  <div class="rail-rec" role="status" hidden><span class="rec-dot" aria-hidden="true"></span><span class="rec-timer mono">00:00</span></div>
   <div class="rail-spacer"></div>
   <button class="icon rail-btn" data-action="theme" data-label="theme">
     <svg class="when-dark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>

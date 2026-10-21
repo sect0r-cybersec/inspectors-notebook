@@ -2,6 +2,8 @@ import pytest
 
 from inspectors_notebook import settings as store
 from inspectors_notebook.geometry import MIN_WIDTH, RAIL_WIDTH, Layout
+from inspectors_notebook.case_store import CaseStore
+from inspectors_notebook.cases import CaseManager
 from inspectors_notebook.panel import PanelApi
 from inspectors_notebook.settings import Settings
 
@@ -41,6 +43,8 @@ def test_initial_state(path):
         "width": 400,
         "collapsed": False,
         "listener": {"browsers": 0, "tabs": 0},
+        "case": None,
+        "suggestion": None,
     }
 
 
@@ -123,3 +127,17 @@ def test_expand_only_redocks_when_collapsed(path):
     api._expand()
     assert api.get_state()["collapsed"] is False
     assert dock.applied[-1] == Layout("right", 400, "appbar")
+
+
+def test_case_controls_drive_the_case_manager(path, tmp_path):
+    cases = CaseManager(CaseStore(tmp_path / "cases"))
+    api = PanelApi(Settings(), path, FakeDock(), lambda: False, cases)
+    form = {"incidentId": " 4821 ", "title": "Suspicious PowerShell", "entities": "HOST-12, j.smith\n203.0.113.7\n"}
+    state = api.start_case(form)
+    assert state["case"]["incidentId"] == "4821"
+    assert state["case"]["entities"] == ["HOST-12", "j.smith", "203.0.113.7"]
+    assert api.pause_case()["case"]["state"] == "paused"
+    assert api.resume_case()["case"]["state"] == "recording"
+    assert api.add_entity("evil.exe")["case"]["entities"][-1] == "evil.exe"
+    assert "j.smith" not in api.remove_entity("j.smith")["case"]["entities"]
+    assert api.stop_case()["case"] is None

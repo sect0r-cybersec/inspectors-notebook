@@ -17,7 +17,7 @@ Inspector's Notebook records what you do in security consoles during an investig
   <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
 </p>
 
-> **Status:** early development. The docked panel, the browser connection, and Defender XDR and Sentinel query capture work today. Case recording, the timeline, notes and export follow.
+> **Status:** early development. The docked panel, the browser connection, Defender XDR and Sentinel query capture, and recording cases work today. The timeline view, notes and export follow.
 
 ## Features
 
@@ -27,14 +27,15 @@ Inspector's Notebook records what you do in security consoles during an investig
 - **Always listening, never recording without you.** The extension watches Defender XDR and Azure portal tabs, but nothing is captured unless the app is open.
 - **One click to start.** Open Inspector from the browser's toolbar popup and the app starts and connects.
 - **Queries captured as you run them.** Advanced hunting in Defender XDR and Logs in Sentinel: the exact KQL, the row count, the columns, and the error if it fails. Entities such as IPs, hashes and files are picked out of the results.
+- **Cases that sort themselves.** Start a case, add the hosts, users and IPs you care about, and every capture is kept, sent for review or hidden: anything that mentions a case entity is always kept, while duplicates, list pages, events from another tenant and anything captured while you were away are set aside. Nothing is deleted; hidden events can be restored.
 - **Per-tab pause.** Stop capture in any console tab from the popup.
 - **Local only.** The browser and the app talk over a pipe only your Windows account can open. Nothing listens on a network port.
 
 **Planned**
 
-- Case timeline with findings highlighted, notes and one-click keep or hide.
+- Timeline view with findings highlighted, notes and one-click keep or hide.
 - Export to plain text, Markdown or HTML, with key findings first.
-- A rolling cache of your last five cases, encrypted per case.
+- A rolling cache of your last five cases.
 - A local decision model that labels events and suggests when to start a case.
 
 ## Quick start
@@ -79,10 +80,12 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 - [Window behaviour checklist](tests/manual/S1-window-checklist.md): docking, multiple monitors, mixed scaling and sleep.
 - [Relay and extension checklist](tests/manual/S2-relay-checklist.md): the browser connection end to end.
 - [Lab capture guide](tests/manual/S3-lab-capture-guide.md): what to capture in the lab to finish the console parsers.
+- [Cases checklist](tests/manual/S4-case-checklist.md): starting, pausing and stopping cases in the real app.
+- [Decisions](docs/decisions.md): where the build departs from the original requirements, and why.
 
 ## For developers
 
-The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture.
+The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) is built. Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
 
 | Path | What it holds |
 | --- | --- |

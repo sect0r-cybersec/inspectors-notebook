@@ -1,9 +1,9 @@
 """The companion's end of the pipe: one relay connection per browser (FR-36).
 
-Tracks which browsers are connected and how many console tabs they report, and
-answers each hello with the recording state. Screenshot requests are captured on a
-worker thread so the pipe keeps flowing. Capture events and screenshots are counted
-but not kept: the case manager that stores them arrives in S4.
+Tracks which browsers are connected and how many console tabs they report, and tells
+every browser whether a case is recording. Capture events go to the case manager.
+Screenshot requests are captured on a worker thread, so the pipe keeps flowing, and
+only while a case records.
 """
 
 import logging
@@ -12,6 +12,7 @@ import threading
 from typing import Callable
 
 from . import pipe
+from .cases import CaseManager
 from .screenshot import Screenshotter
 
 log = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class Bridge:
         on_listener: Callable[[dict], None],
         on_show: Callable[[], None],
         screenshotter: Screenshotter | None = None,
+        cases: CaseManager | None = None,
     ):
         self._server = server
         self._on_listener = on_listener
@@ -34,6 +36,8 @@ class Bridge:
         self._clients: dict[int, dict] = {}
         self._next_id = 0
         self._shooter = screenshotter
+        self._cases = cases
+        self._recording = False
         self._shot_requests: queue.Queue = queue.Queue(maxsize=8)
         self.events_received = 0
         self.screenshots_taken = 0
@@ -56,12 +60,28 @@ class Bridge:
     def _notify(self) -> None:
         self._on_listener(self.listener())
 
+    def _is_recording(self) -> bool:
+        return bool(self._cases and self._cases.recording)
+
+    def set_recording(self, recording: bool) -> None:
+        """Tell every connected browser when a case starts or stops recording."""
+        with self._lock:
+            if recording == self._recording:
+                return
+            self._recording = recording
+            conns = [c["conn"] for c in self._clients.values() if c["browser"]]
+        for conn in conns:
+            try:
+                conn.send({"type": "status", "recording": recording})
+            except pipe.PipeError:
+                pass  # that browser is going away; its reader thread cleans up
+
     def _serve(self) -> None:
         while (conn := self._server.accept()) is not None:
             with self._lock:
                 cid = self._next_id
                 self._next_id += 1
-                self._clients[cid] = {"browser": None, "tabs": 0}
+                self._clients[cid] = {"browser": None, "tabs": 0, "conn": conn}
             threading.Thread(target=self._client, args=(cid, conn), name=f"relay-{cid}", daemon=True).start()
 
     def _client(self, cid: int, conn: pipe.Connection) -> None:
@@ -88,7 +108,7 @@ class Bridge:
             except Exception as e:
                 log.warning("Screenshot failed: %s", e)
                 shot = None
-            if shot:
+            if shot and self._cases and self._cases.add_screenshot(request, shot.webp, shot.width, shot.height):
                 self.screenshots_taken += 1
             else:
                 self.screenshots_skipped += 1
@@ -100,7 +120,7 @@ class Bridge:
             with self._lock:
                 self._clients[cid]["browser"] = browser
             log.info("%s connected", browser)
-            conn.send({"type": "status", "recording": False})
+            conn.send({"type": "status", "recording": self._is_recording()})
             self._notify()
         elif kind == "tabs":
             count = message.get("count")
@@ -110,9 +130,14 @@ class Bridge:
                 self._notify()
         elif kind == "event":
             self.events_received += 1
+            if self._cases:
+                self._cases.ingest(message)
         elif kind == "screenshot_request":
             with self._lock:
                 browser = self._clients[cid]["browser"]
+            if not self._is_recording():
+                self.screenshots_skipped += 1
+                return
             try:
                 self._shot_requests.put_nowait((browser, message))
             except queue.Full:

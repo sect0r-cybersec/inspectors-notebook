@@ -203,3 +203,15 @@ test("the hook ignores other requests and never breaks the page", async () => {
   assert.deepEqual(posted, []);
   assert.equal(calls.length, 4);
 });
+
+test("Defender: tenant from ?tid= and list pages are navigation only (from lab URLs)", () => {
+  const tid = "00000000-0000-0000-0000-000000000001";
+  assert.equal(Parsers.tenantFromUrl(`https://security.microsoft.com/alerts?tid=${tid}`), tid);
+  assert.equal(Parsers.tenantFromUrl("https://security.microsoft.com/v2/advanced-hunting"), null);
+  assert.equal(Parsers.tenantFromUrl("https://portal.azure.com/#view/x?tid=abc"), null);
+  assert.equal(Parsers.isNavigationOnly(`https://security.microsoft.com/alerts?tid=${tid}`), true);
+  assert.equal(Parsers.isNavigationOnly("https://security.microsoft.com/incidents/"), true);
+  assert.equal(Parsers.isNavigationOnly("https://security.microsoft.com/incidents/4821"), false);
+  assert.equal(Parsers.isNavigationOnly("https://security.microsoft.com/v2/advanced-hunting"), false);
+  assert.equal(Parsers.isNavigationOnly("not a url"), false);
+});
