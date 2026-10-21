@@ -1,0 +1,11 @@
+# Handoff bundle (not part of the repo)
+inspectors-notebook-handoff.zip
+.handoff/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+build/
