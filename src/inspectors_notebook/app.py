@@ -11,6 +11,8 @@ import webview
 from . import pipe, win32
 from . import settings as settings_store
 from .bridge import Bridge
+from .case_store import CaseStore, default_root
+from .cases import CaseManager
 from .dock import Dock
 from .geometry import RAIL_WIDTH, Layout
 from .panel import PanelApi
@@ -61,7 +63,8 @@ def main() -> None:
     path = settings_store.default_path()
     settings = settings_store.load(path)
     dock = Dock()
-    api = PanelApi(settings, path, dock, win32.windows_uses_light_theme)
+    cases = CaseManager(CaseStore(default_root()), lambda: on_cases_changed(), idle_seconds=win32.idle_seconds)
+    api = PanelApi(settings, path, dock, win32.windows_uses_light_theme, cases)
     theme = api.get_state()["theme"]
 
     window = webview.create_window(
@@ -95,7 +98,11 @@ def main() -> None:
         window.show()
         push_state()
 
-    bridge = Bridge(server, on_listener, on_show, Screenshotter())
+    bridge = Bridge(server, on_listener, on_show, Screenshotter(), cases)
+
+    def on_cases_changed() -> None:
+        bridge.set_recording(cases.recording)
+        push_state()
 
     def dock_and_show() -> None:
         window.events.loaded -= dock_and_show
@@ -107,6 +114,7 @@ def main() -> None:
         bridge.start()
 
     def shut_down() -> None:
+        cases.stop()
         bridge.stop()
         dock.stop()
 

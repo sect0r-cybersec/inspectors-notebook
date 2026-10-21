@@ -4,11 +4,13 @@ pywebview exposes every public method of this object to the page as
 `window.pywebview.api.<name>`, so internal state is kept in underscored attributes.
 """
 
+import re
 import threading
 from pathlib import Path
 from typing import Callable, Protocol
 
 from . import settings as settings_store
+from .cases import CaseManager
 from .geometry import RAIL_WIDTH, Layout, clamp_width
 from .settings import Settings
 
@@ -26,11 +28,13 @@ class PanelApi:
         settings_path: Path,
         dock: DockLike,
         windows_uses_light_theme: Callable[[], bool],
+        cases: CaseManager | None = None,
     ):
         self._settings = settings
         self._path = settings_path
         self._dock = dock
         self._windows_light = windows_uses_light_theme
+        self._cases = cases
         self._collapsed = False
         self._listener = {"browsers": 0, "tabs": 0}
         self._lock = threading.Lock()
@@ -66,13 +70,56 @@ class PanelApi:
 
     def get_state(self) -> dict:
         with self._lock:
-            return {
+            state = {
                 "side": self._settings.side,
                 "theme": self._effective_theme(),
                 "width": self._settings.width,
                 "collapsed": self._collapsed,
                 "listener": dict(self._listener),
             }
+        state.update(self._cases.summary() if self._cases else {"case": None, "suggestion": None})
+        return state
+
+    # Cases (FR-1, FR-3, FR-8, FR-21)
+
+    def start_case(self, form: dict) -> dict:
+        """Start a case by hand. Entities are one per line or comma separated."""
+        entities = [e for e in re.split(r"[,\n]", str(form.get("entities") or "")) if e.strip()]
+        self._cases.start(
+            incident_id=str(form.get("incidentId") or ""),
+            title=str(form.get("title") or ""),
+            entities=entities,
+            console=form.get("console") or None,
+        )
+        return self.get_state()
+
+    def pause_case(self) -> dict:
+        self._cases.pause()
+        return self.get_state()
+
+    def resume_case(self) -> dict:
+        self._cases.resume()
+        return self.get_state()
+
+    def stop_case(self) -> dict:
+        self._cases.stop()
+        return self.get_state()
+
+    def add_entity(self, value: str) -> dict:
+        self._cases.add_entity(str(value))
+        return self.get_state()
+
+    def remove_entity(self, value: str) -> dict:
+        self._cases.remove_entity(str(value))
+        return self.get_state()
+
+    def accept_suggestion(self) -> dict:
+        self._cases.accept_suggestion()
+        return self.get_state()
+
+    def dismiss_suggestion(self) -> dict:
+        self._cases.dismiss_suggestion()
+        return self.get_state()
 
     def toggle_side(self) -> dict:
         with self._lock:

@@ -10,6 +10,8 @@ if sys.platform != "win32":
 
 from inspectors_notebook import pipe
 from inspectors_notebook.bridge import MAX_TABS, Bridge
+from inspectors_notebook.case_store import CaseStore
+from inspectors_notebook.cases import CaseManager
 from inspectors_notebook.screenshot import Shot
 
 
@@ -34,12 +36,13 @@ class FakeShooter:
 
 
 @pytest.fixture
-def setup():
+def setup(tmp_path):
     name = rf"\\.\pipe\InspectorsNotebook.test.{uuid.uuid4()}"
     server = pipe.Server(name)
     server.listen()
     updates, shows = [], []
-    bridge = Bridge(server, updates.append, lambda: shows.append(True), FakeShooter())
+    cases = CaseManager(CaseStore(tmp_path / "cases"))
+    bridge = Bridge(server, updates.append, lambda: shows.append(True), FakeShooter(), cases)
     bridge.start()
     clients = []
 
@@ -119,16 +122,46 @@ def test_events_are_counted_not_kept(setup):
     assert "security.microsoft.com" not in repr(bridge._clients)
 
 
-def test_screenshot_requests_are_captured_for_the_requesting_browser(setup):
+def test_screenshots_are_captured_into_the_case_only_while_recording(setup):
     bridge, client, _, _ = setup
     c = client()
     c.send({"type": "hello", "browser": "edge"})
     c.receive()
-    c.send({"type": "screenshot_request", "source": "s1", "tabId": 7, "title": "Incidents", "trigger": "navigation"})
-    c.send({"type": "screenshot_request", "source": "s1", "tabId": 7, "title": "unchanged", "trigger": "tab_switch"})
-    assert wait_for(lambda: (bridge.screenshots_taken, bridge.screenshots_skipped) == (1, 1))
+    request = {"type": "screenshot_request", "source": "s1", "tabId": 7, "title": "Incidents", "trigger": "navigation"}
+    c.send(request)
+    assert wait_for(lambda: bridge.screenshots_skipped == 1)
+    assert bridge._shooter.calls == []  # nothing captured without a case
+
+    bridge._cases.start(title="Lab case")
+    c.send(request)
+    c.send({**request, "title": "unchanged", "trigger": "tab_switch"})
+    assert wait_for(lambda: (bridge.screenshots_taken, bridge.screenshots_skipped) == (1, 2))
     assert bridge._shooter.calls == [("edge", ("s1", 7), "Incidents"), ("edge", ("s1", 7), "unchanged")]
-    assert "WEBP" not in repr(vars(bridge))  # counted, not kept, until the case store (S4)
+    shot = bridge._cases.events()[0][0]
+    assert (shot["kind"], shot["trigger"], shot["file"]) == ("screenshot", "navigation", "screenshots/000001.webp")
+
+
+def test_browsers_hear_when_recording_starts_and_stops(setup):
+    bridge, client, _, _ = setup
+    c = client()
+    c.send({"type": "hello", "browser": "chrome"})
+    assert c.receive() == {"type": "status", "recording": False}
+    bridge.set_recording(True)
+    assert c.receive() == {"type": "status", "recording": True}
+    bridge.set_recording(True)  # no change, no message
+    bridge.set_recording(False)
+    assert c.receive() == {"type": "status", "recording": False}
+
+
+def test_capture_events_go_to_the_case(setup):
+    bridge, client, _, _ = setup
+    bridge._cases.start(entities=["HOST-12"])
+    c = client()
+    c.send({"type": "hello", "browser": "chrome"})
+    assert c.receive() == {"type": "status", "recording": True}
+    c.send({"type": "event", "kind": "query", "query": "DeviceInfo | where DeviceName == 'HOST-12'"})
+    assert wait_for(lambda: len(bridge._cases.events()) == 1)
+    assert bridge._cases.events()[0][1].reason == "entity"
 
 
 def test_one_client_failing_leaves_others_working(setup):
