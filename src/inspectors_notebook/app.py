@@ -8,7 +8,7 @@ from importlib import resources
 
 import webview
 
-from . import pipe, win32
+from . import autostart, hotkeys, pipe, win32
 from . import settings as settings_store
 from .bridge import Bridge
 from .case_store import CaseStore, default_root
@@ -62,9 +62,13 @@ def main() -> None:
 
     path = settings_store.default_path()
     settings = settings_store.load(path)
+    settings.start_with_windows = autostart.is_enabled()  # the registry is the source of truth
     dock = Dock()
-    cases = CaseManager(CaseStore(default_root()), lambda: on_cases_changed(), idle_seconds=win32.idle_seconds)
+    cases = CaseManager(
+        CaseStore(default_root()), lambda: on_cases_changed(), idle_seconds=win32.idle_seconds, settings=lambda: settings
+    )
     api = PanelApi(settings, path, dock, win32.windows_uses_light_theme, cases)
+    api._autostart = autostart.set_enabled
     theme = api.get_state()["theme"]
 
     window = webview.create_window(
@@ -98,11 +102,40 @@ def main() -> None:
         window.show()
         push_state()
 
-    bridge = Bridge(server, on_listener, on_show, Screenshotter(), cases)
+    bridge = Bridge(server, on_listener, on_show, Screenshotter(), cases, settings=lambda: settings)
 
     def on_cases_changed() -> None:
         bridge.update_status()
         push_state()
+
+    api._on_settings = on_cases_changed
+
+    # Global shortcuts (docs/decisions.md): each shows the panel when it needs it.
+    def call_page(script: str) -> None:
+        api._expand()
+        window.show()
+        push_state()
+        if loaded.is_set():
+            window.evaluate_js(script)
+
+    def on_record_key() -> None:
+        if not cases.summary()["case"]:
+            call_page("openStartForm()")
+        elif cases.recording:
+            cases.pause()
+        else:
+            cases.resume()
+
+    def on_panel_key() -> None:
+        state = api.get_state()
+        if state["collapsed"]:
+            api._expand()
+            window.show()
+        else:
+            api.toggle_collapse()
+        push_state()
+
+    keys = hotkeys.Hotkeys({"note": lambda: call_page("focusNote()"), "record": on_record_key, "panel": on_panel_key})
 
     def dock_and_show() -> None:
         window.events.loaded -= dock_and_show
@@ -112,12 +145,15 @@ def main() -> None:
         window.show()
         loaded.set()
         bridge.start()
+        api._shortcuts_unavailable = [hotkeys.label(name) for name in keys.start()]
 
     def shut_down() -> None:
+        keys.stop()
         cases.stop()
         bridge.stop()
         dock.stop()
 
+    api._window = window
     window.events.loaded += dock_and_show
     window.events.closed += shut_down
     atexit.register(shut_down)
