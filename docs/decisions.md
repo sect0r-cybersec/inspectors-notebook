@@ -6,7 +6,7 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ### S5 choices
 
-- **Global shortcuts use Ctrl+Alt**: Ctrl+Alt+N adds a note, Ctrl+Alt+R starts or pauses recording, Ctrl+Alt+I shows or collapses the panel. The spec's Ctrl+Shift+N would take over Chrome's incognito window, Edge's InPrivate window and Firefox's reopen-closed-window while Inspector runs. Changes FR-25 and FR-53.
+- **Global shortcuts use Ctrl+Alt**: Ctrl+Alt+N adds a note, Ctrl+Alt+S starts or pauses recording, Ctrl+Alt+I shows or collapses the panel. The spec's Ctrl+Shift+N would take over Chrome's incognito window, Edge's InPrivate window and Firefox's reopen-closed-window while Inspector runs. Ctrl+Alt+R was planned for recording but another program held it on the development machine. A shortcut another program holds is reported in Settings rather than silently lost. Changes FR-25 and FR-53.
 - **Findings are starred by the analyst** until the model's finding highlights exist (S7, MJ-3). Starred events lead the export's Key findings.
 - **Export defaults**: up to 5 relevant rows per query, and interval screenshots every 60 seconds when switched on. Both are settings (the spec's open questions).
 - **The installer is its own stage after S5**, not part of S5's exit tests.
