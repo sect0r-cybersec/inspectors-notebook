@@ -1,29 +1,78 @@
-"""Panel settings, stored as JSON in the user's roaming profile."""
+"""Settings, stored as JSON in the user's roaming profile.
+
+Values from the file and from the settings screen go through the same checks; anything
+missing or invalid keeps its current value (the default, on load).
+"""
 
 import json
 import logging
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Literal
 
-from .geometry import DEFAULT_WIDTH, DockMode, Side, clamp_width
+from .geometry import DEFAULT_WIDTH, MAX_WIDTH, MIN_WIDTH, DockMode, Side
 
 log = logging.getLogger(__name__)
 
 Theme = Literal["dark", "light", "system"]
 
-_SIDES = ("left", "right")
-_THEMES = ("dark", "light", "system")
-_DOCK_MODES = ("appbar", "float")
-
 
 @dataclass
 class Settings:
+    # Window (FR-48 to FR-52)
     side: Side = "right"
     theme: Theme = "dark"
     width: int = DEFAULT_WIDTH
     dock: DockMode = "appbar"
+    start_with_windows: bool = False  # FR-38
+    # Starting cases (FR-3, FR-6)
+    suggest_cases: bool = True
+    dwell_seconds: int = 30
+    preroll_minutes: int = 3
+    # Screenshots (FR-13); interval 0 means off
+    screenshots: bool = True
+    interval_seconds: int = 0
+    # Case cache (FR-29, FR-32)
+    cache_size: int = 5
+    warn_unexported: bool = True
+    # Times and exports (docs/decisions.md)
+    show_utc: bool = False
+    export_rows: int = 5
+
+
+CHOICES = {"side": ("left", "right"), "theme": ("dark", "light", "system"), "dock": ("appbar", "float")}
+RANGES = {
+    "width": (MIN_WIDTH, MAX_WIDTH),
+    "dwell_seconds": (5, 600),
+    "preroll_minutes": (1, 30),
+    "interval_seconds": (0, 3600),
+    "cache_size": (1, 50),
+    "export_rows": (0, 50),
+}
+INTERVAL_MIN = 15  # an interval below this is too frequent to be useful
+
+
+def changed(settings: Settings, changes: dict) -> Settings:
+    """A copy with every valid change applied; invalid ones are ignored."""
+    valid = {}
+    for name, value in changes.items():
+        if name not in Settings.__dataclass_fields__:
+            continue
+        current = getattr(settings, name)
+        if name in CHOICES:
+            if value in CHOICES[name]:
+                valid[name] = value
+        elif isinstance(current, bool):
+            if isinstance(value, bool):
+                valid[name] = value
+        elif isinstance(value, int) and not isinstance(value, bool):
+            low, high = RANGES[name]
+            value = max(low, min(high, value))
+            if name == "interval_seconds" and 0 < value < INTERVAL_MIN:
+                value = INTERVAL_MIN
+            valid[name] = value
+    return replace(settings, **valid)
 
 
 def default_path() -> Path:
@@ -39,20 +88,7 @@ def load(path: Path) -> Settings:
     except (OSError, ValueError) as e:
         log.warning("Ignoring unreadable settings file %s: %s", path, e)
         return Settings()
-    if not isinstance(raw, dict):
-        return Settings()
-
-    s = Settings()
-    if raw.get("side") in _SIDES:
-        s.side = raw["side"]
-    if raw.get("theme") in _THEMES:
-        s.theme = raw["theme"]
-    if raw.get("dock") in _DOCK_MODES:
-        s.dock = raw["dock"]
-    width = raw.get("width")
-    if isinstance(width, int) and not isinstance(width, bool):
-        s.width = clamp_width(width)
-    return s
+    return changed(Settings(), raw) if isinstance(raw, dict) else Settings()
 
 
 def save(settings: Settings, path: Path) -> None:

@@ -13,12 +13,13 @@ from collections import deque
 from datetime import datetime
 from typing import Callable
 
-from . import rules
+from . import cache, rules
 from .case_store import CaseStore
 from .rules import KEEP, CaseContext, Decision
+from .settings import Settings
 
-PREROLL_SECONDS = 180  # FR-6
-DWELL_SECONDS = 30  # FR-3
+PREROLL_SECONDS = Settings().preroll_minutes * 60  # FR-6 default; the setting wins
+DWELL_SECONDS = Settings().dwell_seconds  # FR-3 default; the setting wins
 IDLE_SECONDS = 300  # FR-18: events captured after this long without input are hidden
 
 
@@ -38,12 +39,15 @@ class CaseManager:
         clock: Callable[[], float] = time.monotonic,
         idle_seconds: Callable[[], float] = lambda: 0.0,
         now: Callable[[], str] = local_now,
+        settings: Callable[[], Settings] = Settings,
     ):
         self._store = store
         self._on_change = on_change
         self._clock = clock
         self._idle_seconds = idle_seconds
         self._now = now
+        self._settings = settings
+        self._awaiting_confirmation: list[str] = []
         self._lock = threading.RLock()
         self._preroll: deque[tuple[float, dict]] = deque()
         self._case: dict | None = None
@@ -99,7 +103,7 @@ class CaseManager:
             if self._case is None:
                 # The pre-roll holds what happened before a case starts, so only fill it then.
                 self._preroll.append((now, item))
-                while self._preroll and now - self._preroll[0][0] > PREROLL_SECONDS:
+                while self._preroll and now - self._preroll[0][0] > self._settings().preroll_minutes * 60:
                     self._preroll.popleft()
                 changed = self._detect_start(item, now)
             else:
@@ -164,7 +168,9 @@ class CaseManager:
                 self._dwell = {"key": key, "title": item.get("title"), "since": now}
             return False
         dwell = self._dwell
-        if not dwell or dwell["key"] in self._dismissed or now - dwell["since"] < DWELL_SECONDS:
+        if not self._settings().suggest_cases:
+            return False
+        if not dwell or dwell["key"] in self._dismissed or now - dwell["since"] < self._settings().dwell_seconds:
             return False
         if item.get("kind") not in ("query", "page_visit"):
             return False
@@ -216,9 +222,9 @@ class CaseManager:
         self._on_change()
         return case_id
 
-    def _start(self, incident_id=None, console=None, title="", entities=()) -> str:
+    def _start(self, incident_id=None, console=None, title="", entities=(), case_id: str | None = None) -> str:
         incident_id = (incident_id or "").strip() or None
-        existing = self._store.find_by_incident(console, incident_id) if incident_id else None
+        existing = case_id or (self._store.find_by_incident(console, incident_id) if incident_id else None)
         if existing:  # FR-7: reopening a known incident resumes its case
             meta, events, marks = self._store.load(existing)
             meta["entities"] = list(dict.fromkeys(meta.get("entities", []) + list(entities)))
@@ -244,6 +250,7 @@ class CaseManager:
             }
             self._store.create(self._case)
             self._events, self._marks = [], {}
+            self._enforce_cache()
         self._rerun()
         self._suggestion = None
         self._dwell = None
@@ -260,7 +267,7 @@ class CaseManager:
         page onwards, plus any earlier event that mentions a case entity."""
         incident = self._case.get("incidentId")
         now = self._clock()
-        items = [item for t, item in self._preroll if now - t <= PREROLL_SECONDS]
+        items = [item for t, item in self._preroll if now - t <= self._settings().preroll_minutes * 60]
         start = next(
             (i for i, it in enumerate(items) if incident and it.get("incidentId") == incident and it.get("kind") == "page_visit"),
             len(items),
@@ -268,6 +275,73 @@ class CaseManager:
         before = [it for it in items[:start] if rules.matching_entities(it, self._case["entities"])]
         self._preroll.clear()  # each buffered event joins at most one case
         return before + items[start:]
+
+    # Case cache (FR-29 to FR-32)
+
+    def _enforce_cache(self) -> None:
+        s = self._settings()
+        delete, confirm = cache.plan(self._store.list(), self._case and self._case["id"], s.cache_size, s.warn_unexported)
+        for case_id in delete:
+            self._store.delete(case_id)
+        self._awaiting_confirmation = confirm
+
+    def cache_state(self) -> dict:
+        with self._lock:
+            active = self._case and self._case["id"]
+            metas = self._store.list()
+            limit = self._settings().cache_size
+            return {
+                "limit": limit,
+                "bytes": sum(self._store.size(m["id"]) for m in metas),
+                "nextToGo": cache.next_to_go(metas, active, limit),
+                "awaitingConfirmation": [m for m in metas if m["id"] in self._awaiting_confirmation],
+                "cases": [{**m, "active": m["id"] == active, "events": self._event_count(m["id"])} for m in metas],
+            }
+
+    def _event_count(self, case_id: str) -> int:
+        path = self._store.root / case_id / "events.jsonl"
+        try:
+            with open(path, encoding="utf-8") as f:
+                return sum(1 for _ in f)
+        except OSError:
+            return 0
+
+    def open_case(self, case_id: str) -> None:
+        """Make a cached case the active one again, recording."""
+        with self._lock:
+            if self._case and self._case["id"] == case_id:
+                return
+            if self._case:
+                self._stop()
+            meta = self._store.load(case_id)[0]
+            self._start(meta.get("incidentId"), meta.get("console"), case_id=case_id)
+        self._on_change()
+
+    def pin_case(self, case_id: str, pinned: bool) -> None:
+        with self._lock:
+            if self._case and self._case["id"] == case_id:
+                self._case["pinned"] = bool(pinned)
+                self._store.save_meta(self._case)
+            else:
+                self._store.update_meta(case_id, pinned=bool(pinned))
+        self._on_change()
+
+    def delete_case(self, case_id: str) -> None:
+        """Delete a cached case; never the active one."""
+        with self._lock:
+            if self._case and self._case["id"] == case_id:
+                return
+            self._store.delete(case_id)
+            if case_id in self._awaiting_confirmation:
+                self._awaiting_confirmation.remove(case_id)
+        self._on_change()
+
+    def keep_case(self, case_id: str) -> None:
+        """Answer 'keep' to the unexported-case warning: pin it so it is not asked about again."""
+        with self._lock:
+            if case_id in self._awaiting_confirmation:
+                self._awaiting_confirmation.remove(case_id)
+        self.pin_case(case_id, True)
 
     def pause(self) -> None:
         with self._lock:

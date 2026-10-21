@@ -101,5 +101,15 @@ class CaseStore:
                 return meta["id"]
         return None
 
+    def size(self, case_id: str) -> int:
+        """Bytes on disk for one case."""
+        return sum(f.stat().st_size for f in self._dir(case_id).rglob("*") if f.is_file())
+
+    def update_meta(self, case_id: str, **changes) -> dict:
+        meta = json.loads((self._dir(case_id) / "case.json").read_text(encoding="utf-8"))
+        meta.update(changes)
+        self.save_meta(meta)
+        return meta
+
     def delete(self, case_id: str) -> None:
         shutil.rmtree(self._dir(case_id))
