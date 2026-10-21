@@ -14,7 +14,9 @@ A local flight recorder for SOC investigations.
 Inspector's Notebook records what you do in security consoles during an investigation and will hand back a timestamped timeline ready to paste into a ticket. It is built for a single analyst on their own Windows machine: a listener extension in Chrome, Edge or Firefox feeds a desktop panel docked to the edge of your screen. Everything stays on your machine.
 
 <p align="center">
-  <img src="assets/mockup.png" alt="The Inspector's Notebook panel, showing the extension listening in one console tab" width="600">
+  <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
+  <br>
+  <sub>Design of the live case view. The panel and browser connection are built; the case timeline is in progress.</sub>
 </p>
 
 > **Status:** early development. The docked panel and the browser connection work today. Case recording, the timeline, notes and export are next.
