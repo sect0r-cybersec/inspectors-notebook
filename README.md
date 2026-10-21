@@ -17,7 +17,7 @@ Inspector's Notebook records what you do in security consoles during an investig
   <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
 </p>
 
-> **Status:** early development. The docked panel, the browser connection, Defender XDR and Sentinel query capture, and recording cases work today. The timeline view, notes and export follow.
+> **Status:** early development. Phase 1 is built: the docked panel, the browser connection, Defender XDR and Sentinel query capture, cases, the timeline, notes and export. The Windows installer and the local decision model come next.
 
 ## Features
 
@@ -29,15 +29,17 @@ Inspector's Notebook records what you do in security consoles during an investig
 - **Works on any site you choose.** Inspector recognises incident, alert, case and ticket pages from their URL on any platform, and suggests starting a case when you dwell on one and start investigating. Defender XDR and Sentinel are listened to out of the box; add your SIEM, EDR or ticketing system with **Listen on this site** in the extension popup.
 - **Queries captured as you run them.** Advanced hunting in Defender XDR and Logs in Sentinel: the exact KQL, the row count, the columns, and the error if it fails. Entities such as IPs, hashes and files are picked out of the results.
 - **Cases that sort themselves.** Start a case, add the hosts, users and IPs you care about, and every capture is kept, sent for review or hidden: anything that mentions a case entity is always kept, while duplicates, list pages, events from another tenant and anything captured while you were away are set aside. Nothing is deleted; hidden events can be restored.
+- **A timeline you can trust.** Newest first, with Timeline, Findings, Review and Hidden tabs. Star findings, comment on events, add notes, keep or hide anything in one click.
+- **Exports ready for the ticket.** Plain text, Markdown or HTML, copied or saved, with your findings first, each query's text, a summary line built from the data and the rows that name your entities. Pinned screenshots go in a zip named after their timeline entries.
+- **A tidy case cache.** The last five cases are kept; older ones are removed, never the one you are working on or ones you pinned, and Inspector asks before removing a case you never exported.
+- **Keyboard shortcuts from anywhere.** Ctrl+Alt+N adds a note, Ctrl+Alt+S starts or pauses a case, Ctrl+Alt+I shows or collapses the panel.
 - **Per-tab pause.** Stop capture in any console tab from the popup.
 - **Local only.** The browser and the app talk over a pipe only your Windows account can open. Nothing listens on a network port.
 
 **Planned**
 
-- Timeline view with findings highlighted, notes and one-click keep or hide.
-- Export to plain text, Markdown or HTML, with key findings first.
-- A rolling cache of your last five cases.
-- A local decision model that labels events and suggests when to start a case.
+- A Windows installer, so Python is not needed.
+- A local decision model that labels events, highlights findings and decides borderline events.
 
 ## Quick start
 
@@ -82,11 +84,12 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 - [Relay and extension checklist](tests/manual/S2-relay-checklist.md): the browser connection end to end.
 - [Lab capture guide](tests/manual/S3-lab-capture-guide.md): what to capture in the lab to finish the console parsers.
 - [Cases checklist](tests/manual/S4-case-checklist.md): starting, pausing and stopping cases in the real app.
+- [Timeline and export checklist](tests/manual/S5-timeline-export-checklist.md): the timeline, exports, the case cache, settings and shortcuts.
 - [Decisions](docs/decisions.md): where the build departs from the original requirements, and why.
 
 ## For developers
 
-The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) is built. Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
+The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) and stage 5 (timeline, export, case cache, settings) are built. Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
 
 | Path | What it holds |
 | --- | --- |
