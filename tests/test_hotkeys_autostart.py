@@ -1,3 +1,4 @@
+import subprocess
 import sys
 import time
 import winreg
@@ -28,10 +29,22 @@ def test_start_with_windows_adds_and_removes_the_run_entry(run_key):  # FR-38
     assert autostart.is_enabled(run_key)
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, run_key) as key:
         value = winreg.QueryValueEx(key, autostart.VALUE)[0]
-    assert value.endswith('pythonw.exe" -m inspectors_notebook') and value.startswith('"')
+    assert value == subprocess.list2cmdline(autostart.companion_command())
     autostart.set_enabled(False, run_key)
     autostart.set_enabled(False, run_key)  # already off
     assert not autostart.is_enabled(run_key)
+
+
+def test_companion_command_from_source_and_installed():
+    assert autostart.companion_command(r"C:\venv\Scripts\python.exe", frozen=False) == [
+        r"C:\venv\Scripts\pythonw.exe", "-m", "inspectors_notebook",
+    ]  # fmt: skip
+    # The relay and the register tool sit beside the app in the installed folder.
+    installed = r"C:\Users\a\AppData\Local\Programs\InspectorsNotebook\inspectors-notebook-relay.exe"
+    assert autostart.companion_command(installed, frozen=True) == [
+        r"C:\Users\a\AppData\Local\Programs\InspectorsNotebook\inspectors-notebook.exe"
+    ]
+    assert subprocess.list2cmdline([r"C:\Program Files\x\a.exe"]) == r'"C:\Program Files\x\a.exe"'
 
 
 def test_shortcut_labels_use_ctrl_alt():
