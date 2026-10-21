@@ -16,6 +16,7 @@ from .cases import CaseManager
 from .dock import Dock
 from .geometry import RAIL_WIDTH, Layout
 from .panel import PanelApi
+from .refresh import Refresher
 from .screenshot import Screenshotter
 
 log = logging.getLogger(__name__)
@@ -104,9 +105,15 @@ def main() -> None:
 
     bridge = Bridge(server, on_listener, on_show, Screenshotter(), cases, settings=lambda: settings)
 
-    def on_cases_changed() -> None:
+    def refresh() -> None:
         bridge.update_status()
         push_state()
+
+    # A capture burst would otherwise rebuild and resend the whole panel per event (S6).
+    refresher = Refresher(refresh)
+
+    def on_cases_changed() -> None:
+        refresher.request()
 
     api._on_settings = on_cases_changed
 
@@ -144,12 +151,14 @@ def main() -> None:
         dock.flush()
         window.show()
         loaded.set()
+        refresher.start()
         bridge.start()
         api._shortcuts_unavailable = [hotkeys.label(name) for name in keys.start()]
 
     def shut_down() -> None:
         keys.stop()
-        cases.stop()
+        cases.close()
+        refresher.stop()
         bridge.stop()
         dock.stop()
 
