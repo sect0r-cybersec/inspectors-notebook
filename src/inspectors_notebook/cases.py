@@ -11,6 +11,7 @@ import threading
 import time
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from typing import Callable
 
 from . import cache, rules
@@ -437,6 +438,10 @@ class CaseManager:
     def marks(self) -> dict[int, dict]:
         with self._lock:
             return {k: dict(v) for k, v in self._marks.items()}
+
+    def case_dir(self) -> Path | None:
+        with self._lock:
+            return self._store.root / self._case["id"] if self._case else None
 
     def case_meta(self) -> dict | None:
         with self._lock:

@@ -113,3 +113,7 @@ def test_the_same_query_against_another_tenant_is_not_a_duplicate():
     ctx = CaseContext(tenant="tenant-a", kept_queries={query_key(kept)})
     assert decide(query("DeviceInfo | take 1", tenant="tenant-a"), ctx).reason == "duplicate"
     assert decide(query("DeviceInfo | take 1", tenant="tenant-b"), ctx).reason == "other_tenant"
+
+
+def test_entities_in_notes_count():
+    assert matching_entities({"kind": "note", "text": "HOST-12 beacons every minute"}, ["HOST-12"]) == ["HOST-12"]

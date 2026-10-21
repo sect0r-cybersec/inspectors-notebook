@@ -1,6 +1,7 @@
 """ctypes bindings for the few Win32 calls the panel needs."""
 
 import ctypes
+import time
 import winreg
 from ctypes import wintypes
 
@@ -215,3 +216,69 @@ def windows_uses_light_theme() -> bool:
             return winreg.QueryValueEx(key, "AppsUseLightTheme")[0] == 1
     except OSError:
         return False
+
+
+# Clipboard (FR-27)
+
+CF_UNICODETEXT = 13
+GMEM_MOVEABLE = 0x0002
+OpenClipboard = _sig(user32.OpenClipboard, wintypes.BOOL, wintypes.HWND)
+CloseClipboard = _sig(user32.CloseClipboard, wintypes.BOOL)
+EmptyClipboard = _sig(user32.EmptyClipboard, wintypes.BOOL)
+SetClipboardData = _sig(user32.SetClipboardData, wintypes.HANDLE, wintypes.UINT, wintypes.HANDLE)
+GetClipboardData = _sig(user32.GetClipboardData, wintypes.HANDLE, wintypes.UINT)
+RegisterClipboardFormatW = _sig(user32.RegisterClipboardFormatW, wintypes.UINT, wintypes.LPCWSTR)
+GlobalAlloc = _sig(kernel32.GlobalAlloc, wintypes.HGLOBAL, wintypes.UINT, ctypes.c_size_t)
+GlobalLock = _sig(kernel32.GlobalLock, wintypes.LPVOID, wintypes.HGLOBAL)
+GlobalUnlock = _sig(kernel32.GlobalUnlock, wintypes.BOOL, wintypes.HGLOBAL)
+
+
+def _cf_html(fragment: str) -> bytes:
+    """Windows' "HTML Format": a header of byte offsets, then the document."""
+    prefix = "<html><body><!--StartFragment-->"
+    suffix = "<!--EndFragment--></body></html>"
+    template = "Version:0.9\r\nStartHTML:{:010d}\r\nEndHTML:{:010d}\r\nStartFragment:{:010d}\r\nEndFragment:{:010d}\r\n"
+    header_len = len(template.format(0, 0, 0, 0).encode("ascii"))
+    body = (prefix + fragment + suffix).encode("utf-8")
+    start_fragment = header_len + len(prefix.encode("utf-8"))
+    end_fragment = start_fragment + len(fragment.encode("utf-8"))
+    header = template.format(header_len, header_len + len(body), start_fragment, end_fragment)
+    return header.encode("ascii") + body
+
+
+def _global(data: bytes) -> int:
+    handle = GlobalAlloc(GMEM_MOVEABLE, len(data))
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    ctypes.memmove(GlobalLock(handle), data, len(data))
+    GlobalUnlock(handle)
+    return handle
+
+
+def set_clipboard(text: str, html: str | None = None) -> None:
+    """Put text (and optionally HTML, for rich paste) on the clipboard."""
+    for _ in range(10):  # another program may hold the clipboard for a moment
+        if OpenClipboard(None):
+            break
+        time.sleep(0.05)
+    else:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        EmptyClipboard()
+        SetClipboardData(CF_UNICODETEXT, _global((text + "\0").encode("utf-16-le")))
+        if html is not None:
+            SetClipboardData(RegisterClipboardFormatW("HTML Format"), _global(_cf_html(html) + b"\0"))
+    finally:
+        CloseClipboard()
+
+
+def get_clipboard_text() -> str:
+    if not OpenClipboard(None):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        handle = GetClipboardData(CF_UNICODETEXT)
+        return ctypes.wstring_at(GlobalLock(handle)) if handle else ""
+    finally:
+        if handle:
+            GlobalUnlock(handle)
+        CloseClipboard()

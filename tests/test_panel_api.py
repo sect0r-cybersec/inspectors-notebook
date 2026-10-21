@@ -45,6 +45,7 @@ def test_initial_state(path):
         "listener": {"browsers": 0, "tabs": 0},
         "case": None,
         "suggestion": None,
+        "timeline": [],
     }
 
 
@@ -141,3 +142,30 @@ def test_case_controls_drive_the_case_manager(path, tmp_path):
     assert api.add_entity("evil.exe")["case"]["entities"][-1] == "evil.exe"
     assert "j.smith" not in api.remove_entity("j.smith")["case"]["entities"]
     assert api.stop_case()["case"] is None
+
+
+def test_timeline_actions_and_settings(path, tmp_path):
+    cases = CaseManager(CaseStore(tmp_path / "cases"))
+    dock = FakeDock()
+    api = PanelApi(Settings(), path, dock, lambda: False, cases)
+    settings_changed, autostart = [], []
+    api._on_settings = lambda: settings_changed.append(True)
+    api._autostart = autostart.append
+    api.start_case({"title": "Case", "entities": "HOST-12"})
+    state = api.add_note("Saw HOST-12 beaconing")
+    [note] = state["timeline"]
+    assert (note["kind"], note["text"], note["reason"]) == ("note", "Saw HOST-12 beaconing", "entity")
+    state = api.star_item(note["ids"], True)
+    assert state["timeline"][0]["star"] and state["case"]["counts"]["findings"] == 1
+    assert api.comment_item(note["ids"], "Beacon every 60 s")["timeline"][0]["annotation"] == "Beacon every 60 s"
+    assert api.decide_item(note["ids"], "hide")["timeline"][0]["disposition"] == "hide"
+    assert api.decide_item(note["ids"], None)["timeline"][0]["disposition"] == "keep"
+
+    preview = api.export_preview({"fmt": "markdown"})
+    assert preview["text"].startswith("# Case") and preview["findings"] == 1 and preview["rowLimit"] == 5
+
+    out = api.update_settings({"show_utc": True, "side": "left", "start_with_windows": True, "cache_size": 99})
+    assert (out["show_utc"], out["side"], out["start_with_windows"], out["cache_size"]) == (True, "left", True, 50)
+    assert dock.applied[-1].side == "left" and autostart == [True] and settings_changed == [True]
+    assert store.load(path).show_utc is True
+    assert "UTC" in api.get_state()["timeline"][0]["time"]
