@@ -17,7 +17,7 @@ Inspector's Notebook records what you do in security consoles during an investig
   <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
 </p>
 
-> **Status:** early development. The docked panel and the browser connection work today, and the capture framework is in place. Defender XDR and Sentinel query capture is waiting on lab captures; case recording, the timeline, notes and export follow.
+> **Status:** early development. The docked panel, the browser connection, and Defender XDR and Sentinel query capture work today. Case recording, the timeline, notes and export follow.
 
 ## Features
 
@@ -26,6 +26,7 @@ Inspector's Notebook records what you do in security consoles during an investig
 - **A panel that stays out of the way.** Docks to the right or left screen edge and other windows make room for it. Collapse it to a 64 px rail, switch sides in one click, drag to resize, and pick a dark or light theme.
 - **Always listening, never recording without you.** The extension watches Defender XDR and Azure portal tabs, but nothing is captured unless the app is open.
 - **One click to start.** Open Inspector from the browser's toolbar popup and the app starts and connects.
+- **Queries captured as you run them.** Advanced hunting in Defender XDR and Logs in Sentinel: the exact KQL, the row count, the columns, and the error if it fails. Entities such as IPs, hashes and files are picked out of the results.
 - **Per-tab pause.** Stop capture in any console tab from the popup.
 - **Local only.** The browser and the app talk over a pipe only your Windows account can open. Nothing listens on a network port.
 
@@ -81,7 +82,7 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 
 ## For developers
 
-The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) has its framework built and needs lab captures for the console rules.
+The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture.
 
 | Path | What it holds |
 | --- | --- |

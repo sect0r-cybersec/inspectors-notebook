@@ -1,6 +1,6 @@
 # S3 lab capture guide: filling the console parser gaps
 
-The parser framework, request hook, entity extraction and screenshots are built and tested. What is missing is console-specific: the Defender XDR and Sentinel modules in `extension/src/parsers/` have empty `incidentUrls` and `queryRequests`, so today they record page visits only. This guide lists what to capture from the purple team lab so the rules and their fixture tests can be written from real traffic, not guesses.
+Sections 1 and 2 are done: the Defender XDR and Sentinel query rules in `extension/src/parsers/` were written from lab captures on 21 October 2026, with sanitised fixtures in `extension/tests/fixtures/`. Still open: section 3, incident and alert URLs, because the lab had no incidents to capture. Until then incident IDs are not read. Re-run sections 1 and 2 if a console update breaks query capture.
 
 Use the lab tenant only. Never capture from a client tenant.
 
@@ -22,9 +22,11 @@ Repeat section 1 in Sentinel's Logs blade at `portal.azure.com`. Also note:
 - whether the query editor runs in a frame on another origin (DevTools, Sources tab, frames list); if it does, that origin needs adding to the extension's permissions
 - which request carries the query, and from which frame
 
-## 3. Incident and alert URLs
+## 3. Incident and alert URLs (still needed)
 
-Copy the address bar URL for each of these, and note which part is the ID:
+If the lab has no incidents, raise one: on an onboarded lab device, run Microsoft's detection test from the Defender portal (Settings, Endpoints, Onboarding, "Run a detection test"), or run a Caldera ability that Defender alerts on.
+
+Then copy the address bar URL for each of these, and note which part is the ID:
 
 - a Defender XDR incident page, and its alerts tab
 - a Defender XDR alert page
@@ -37,11 +39,11 @@ On a lab alert with several entity types (device, user, IP, file, hash), save th
 
 ## Where to put it
 
-Save the files under `extension/tests/fixtures/<console>/`, for example `extension/tests/fixtures/defender/hunting.har`. Tell me when they are there and I will write the parser rules and fixture tests from them.
+Put raw captures in `.lab-captures/` (gitignored). Sanitised fixtures are extracted from them into `extension/tests/fixtures/<console>/`, with GUIDs and lab resource names replaced.
 
 ## The 20-query check (S3's exit test)
 
-Once the rules exist:
+The query rules exist, so this can run now:
 
 1. Close Inspector's Notebook, then run `uv run python extension/tests/fake_companion.py --recording` in a terminal. It stands in for the app and prints every capture as a JSON line.
 2. In the lab, run 20 queries across both consoles: short and long, multi-line, with comments, with zero results, and one that fails.
