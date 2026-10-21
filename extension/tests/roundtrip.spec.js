@@ -31,10 +31,17 @@ test.beforeAll(async ({}, testInfo) => {
   const cdp = await context.browser().newBrowserCDPSession();
   const { id } = await cdp.send("Extensions.loadUnpacked", { path: EXTENSION });
   expect(id).toBe(EXTENSION_ID);
-  // Console pages are served locally: the tests never touch the real consoles.
-  await context.route(`${CONSOLE}/**`, (route) =>
-    route.fulfill({ contentType: "text/html", body: `<title>Lab ${new URL(route.request().url()).pathname}</title>` }),
-  );
+  // Console pages are served locally: the tests never touch the real consoles. Each
+  // path gets its own colour, so different pages look different in screenshots.
+  await context.route(`${CONSOLE}/**`, (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname.startsWith("/api/")) return route.fulfill({ contentType: "application/json", body: '{"ok":true}' });
+    const hue = [...pathname].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0);
+    return route.fulfill({
+      contentType: "text/html",
+      body: `<title>Lab ${pathname}</title><body style="margin:0;height:100vh;background:hsl(${hue} 70% 45%)">`,
+    });
+  });
 });
 
 test.afterAll(async () => {
@@ -80,17 +87,19 @@ test("hello and tab count round-trip through relay and companion", async ({}, te
   await expect(ui.getByRole("button", { name: "Show Inspector" })).toBeVisible();
 });
 
-test("console page visits are captured in order with UTC timestamps", async () => {
+test("console page visits are captured in order with local timestamps", async () => {
   const page = await context.newPage();
   await page.goto(`${CONSOLE}/incidents`);
   await page.goto(`${CONSOLE}/alerts`);
 
   const first = await fake.waitFor((m) => m.type === "event" && m.url === `${CONSOLE}/incidents`);
   const second = await fake.waitFor((m) => m.type === "event" && m.url === `${CONSOLE}/alerts`);
-  expect(first).toMatchObject({ kind: "page_visit", console: "defender", title: "Lab /incidents" });
+  expect(first).toMatchObject({ kind: "page_visit", console: "defender", title: "Lab /incidents", incidentId: null });
   expect(second.seq).toBeGreaterThan(first.seq);
   expect(second.source).toBe(first.source);
-  expect(first.ts).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+  // Local time with the UTC offset, so it is still an exact instant.
+  expect(first.ts).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}[+-]\d\d:\d\d$/);
+  expect(Math.abs(Date.parse(first.ts) - Date.now())).toBeLessThan(60_000);
   await fake.waitFor((m) => m.type === "tabs" && m.count === 1);
 
   // Non-console pages are not captured.
@@ -133,4 +142,53 @@ test("nothing is captured while the app is closed", async () => {
   await fake.waitFor((m) => m.type === "tabs" && m.count === 1);
   await page.waitForTimeout(1000);
   expect(fake.messages.filter((m) => m.type === "event")).toEqual([]);
+});
+
+test("console pages keep working with the request hook installed", async () => {
+  const page = await context.newPage();
+  await page.goto(`${CONSOLE}/hunting`);
+  const results = await page.evaluate(async () => {
+    const viaFetch = await (await fetch("/api/hunt", { method: "POST", body: '{"query":"DeviceInfo"}' })).json();
+    const viaXhr = await new Promise((done) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/hunt");
+      xhr.onload = () => done(JSON.parse(xhr.responseText));
+      xhr.send('{"query":"DeviceInfo"}');
+    });
+    return { viaFetch, viaXhr, hooked: typeof window.InspectorHook };
+  });
+  expect(results).toEqual({ viaFetch: { ok: true }, viaXhr: { ok: true }, hooked: "object" });
+  // No console request rules ship yet (they come from lab captures), so nothing is captured.
+  await page.waitForTimeout(500);
+  expect(fake.messages.filter((m) => m.kind === "query" || m.kind === "result")).toEqual([]);
+});
+
+test("screenshot requests while recording: navigation and tab switch", async () => {
+  await fake.stop();
+  fake = await FakeCompanion.start({ recording: true });
+  await fake.waitFor((m) => m.type === "tabs");
+  const requestFor = (path, trigger) =>
+    fake.waitFor((m) => m.type === "screenshot_request" && m.url === `${CONSOLE}${path}` && m.trigger === trigger);
+
+  const a = await context.newPage();
+  await a.goto(`${CONSOLE}/incidents`);
+  const first = await requestFor("/incidents", "navigation");
+  // The companion finds the browser window by the tab's title, then captures it.
+  expect(first).toMatchObject({ console: "defender", title: "Lab /incidents" });
+  expect(first.ts).toMatch(/[+-]\d\d:\d\d$/);
+
+  const b = await context.newPage();
+  await b.goto(`${CONSOLE}/alerts`);
+  await requestFor("/alerts", "navigation");
+
+  await a.bringToFront();
+  await requestFor("/incidents", "tab_switch");
+});
+
+test("no screenshots unless a case is recording", async () => {
+  const page = await context.newPage();
+  await page.goto(`${CONSOLE}/not-recording`);
+  await fake.waitFor((m) => m.type === "event" && m.url === `${CONSOLE}/not-recording`);
+  await page.waitForTimeout(1500);
+  expect(fake.messages.filter((m) => m.type === "screenshot_request")).toEqual([]);
 });

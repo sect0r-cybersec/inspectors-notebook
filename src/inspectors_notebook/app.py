@@ -14,6 +14,7 @@ from .bridge import Bridge
 from .dock import Dock
 from .geometry import RAIL_WIDTH, Layout
 from .panel import PanelApi
+from .screenshot import Screenshotter
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ def main() -> None:
         window.show()
         push_state()
 
-    bridge = Bridge(server, on_listener, on_show)
+    bridge = Bridge(server, on_listener, on_show, Screenshotter())
 
     def dock_and_show() -> None:
         window.events.loaded -= dock_and_show

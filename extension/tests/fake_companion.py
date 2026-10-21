@@ -1,7 +1,8 @@
 """Stands in for the companion during extension tests.
 
 Serves the real user-only pipe, answers each hello the way the companion's bridge
-does, and prints every message it receives as a JSON line. Exits when stdin closes.
+does (reporting a recording case with --recording), and prints every message it
+receives as a JSON line. Exits when stdin closes.
 """
 
 import json
@@ -19,13 +20,16 @@ def emit(message: dict) -> None:
         print(json.dumps(message), flush=True)
 
 
+RECORDING = "--recording" in sys.argv
+
+
 def serve_client(conn: pipe.Connection) -> None:
     try:
         while True:
             message = conn.receive()
             emit(message)
             if message.get("type") == "hello":
-                conn.send({"type": "status", "recording": False})
+                conn.send({"type": "status", "recording": RECORDING})
     except pipe.PipeError:
         pass
 
