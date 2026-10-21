@@ -1,0 +1,119 @@
+/* Design tokens from docs/gui/README.md. Fonts are not downloaded: nothing leaves the machine. */
+:root {
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  --bg: #0F1215;
+  --surface: #171B20;
+  --border: #2A3038;
+  --line: #232930;
+  --text: #E7EAEE;
+  --muted: #9BA5B0;
+  --faint: #7D8792;
+  --logo: #F2B544;
+  --hover: #171B20;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #FFFFFF;
+  --surface: #F1F3F5;
+  --border: #DDE1E6;
+  --line: #E6E9ED;
+  --text: #15191E;
+  --muted: #56606B;
+  --faint: #646E79;
+  --logo: #B07A10;
+  --hover: #F1F3F5;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.45;
+  user-select: none;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, .resize:focus-visible { outline: 2px solid var(--logo); outline-offset: 2px; }
+
+svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.logo { stroke: var(--logo); flex: none; }
+
+[data-theme="dark"] .when-light,
+[data-theme="light"] .when-dark { display: none; }
+[data-side="left"] .flip { transform: scaleX(-1); }
+
+.icon {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon.small { width: 32px; height: 32px; }
+.icon:hover { background: var(--hover); color: var(--text); }
+
+/* Expanded panel */
+
+.panel { position: relative; height: 100%; display: flex; flex-direction: column; }
+.panel[hidden], .rail[hidden] { display: none; }
+
+.resize { position: absolute; top: 0; bottom: 0; width: 6px; z-index: 1; cursor: ew-resize; }
+[data-side="right"] .resize { left: 0; }
+[data-side="left"] .resize { right: 0; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.tools { display: flex; gap: 2px; }
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 43px;
+  padding: 6px 10px 6px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.idle-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--faint); }
+
+.empty { flex: 1; padding: 24px 16px; color: var(--muted); }
+.empty h1 { margin: 0 0 6px; color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.3; }
+.empty p { margin: 0; }
+
+/* Collapsed rail (FR-50) */
+
+.rail {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+}
+.rail-btn { width: 44px; height: 44px; border-radius: 8px; }
+.rail-divider { width: 32px; height: 1px; background: var(--line); }
+.rail-spacer { flex: 1; }
+.rail-logo { margin: 6px 0 4px; }
