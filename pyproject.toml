@@ -13,6 +13,7 @@ dependencies = [
 [project.scripts]
 inspectors-notebook = "inspectors_notebook.app:main"
 inspectors-notebook-relay = "inspectors_notebook.relay:main"
+inspectors-notebook-register = "inspectors_notebook.register:main"
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]
