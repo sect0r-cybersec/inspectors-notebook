@@ -35,7 +35,7 @@ class CaseContext:
     entities: list[str] = field(default_factory=list)
     tenant: str | None = None
     kept_pages: set[str] = field(default_factory=set)
-    kept_queries: set[tuple[str, int | None]] = field(default_factory=set)
+    kept_queries: set[tuple[str, int | None, str | None]] = field(default_factory=set)
 
 
 def event_text(event: dict) -> str:
@@ -61,12 +61,13 @@ def page_key(event: dict) -> str:
     return str(event.get("url") or "")
 
 
-def query_key(event: dict) -> tuple[str, int | None]:
-    return (" ".join(str(event.get("query") or "").split()), event.get("rowCount"))
+def query_key(event: dict) -> tuple[str, int | None, str | None]:
+    """The same query text against the same tenant; another tenant is a different action."""
+    return (" ".join(str(event.get("query") or "").split()), event.get("rowCount"), event.get("tenant"))
 
 
 def is_duplicate(event: dict, case: CaseContext) -> bool:
-    """A page already kept in this case, or the same query with the same row count."""
+    """A page already kept in this case, or the same query against the same tenant."""
     kind = event.get("kind")
     if kind == "page_visit":
         return page_key(event) in case.kept_pages
@@ -101,15 +102,21 @@ def decide(event: dict, case: CaseContext, *, idle: bool = False, manual: str | 
     return Decision(KEEP, "console", flags)
 
 
+# Analysts pivot on these first; hashes are many per row, and a 40-character hex ID
+# (such as Defender's DeviceId) is indistinguishable from a SHA-1.
+SUGGESTION_ORDER = ["ipv4", "domain", "url", "email", "file", "sha256", "md5", "sha1"]
+
+
 def suggested_entities(events: list[dict], decisions: list[Decision], case_entities: list[str]) -> list[str]:
-    """Entities seen in kept events that are not case entities yet (FR-21)."""
+    """Entities seen in kept events that are not case entities yet (FR-21), most useful first."""
     known = {e.lower() for e in case_entities}
-    seen: list[str] = []
+    seen: dict[str, str] = {}
     for event, decision in zip(events, decisions):
         if decision.disposition != KEEP:
             continue
         for entity in event.get("entities") or []:
             value = entity.get("value") if isinstance(entity, dict) else None
             if value and value.lower() not in known and value not in seen:
-                seen.append(value)
-    return seen
+                seen[value] = entity.get("type", "")
+    rank = {t: i for i, t in enumerate(SUGGESTION_ORDER)}
+    return sorted(seen, key=lambda v: rank.get(seen[v], len(rank)))

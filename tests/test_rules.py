@@ -93,3 +93,23 @@ def test_suggested_entities_come_from_kept_events_only():  # FR-21
     ]
     decisions = [decide(events[0], CaseContext()), decide(events[1], CaseContext(), idle=True)]
     assert suggested_entities(events, decisions, ["203.0.113.7"]) == ["evil.exe"]
+
+
+def test_suggestions_put_pivots_before_hashes():
+    event = {"kind": "result", "entities": [
+        {"type": "sha1", "value": "0" * 40},
+        {"type": "sha256", "value": "a" * 64},
+        {"type": "file", "value": "ntoskrnl.exe"},
+        {"type": "ipv4", "value": "203.0.113.7"},
+        {"type": "domain", "value": "evil.example.com"},
+    ]}
+    assert suggested_entities([event], [decide(event, CaseContext())], []) == [
+        "203.0.113.7", "evil.example.com", "ntoskrnl.exe", "a" * 64, "0" * 40,
+    ]
+
+
+def test_the_same_query_against_another_tenant_is_not_a_duplicate():
+    kept = query("DeviceInfo | take 1", tenant="tenant-a")
+    ctx = CaseContext(tenant="tenant-a", kept_queries={query_key(kept)})
+    assert decide(query("DeviceInfo | take 1", tenant="tenant-a"), ctx).reason == "duplicate"
+    assert decide(query("DeviceInfo | take 1", tenant="tenant-b"), ctx).reason == "other_tenant"

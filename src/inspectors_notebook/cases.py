@@ -78,7 +78,7 @@ class CaseManager:
                     "state": "paused" if self._paused else "recording",
                     "elapsedSeconds": int(elapsed),
                     "counts": counts,
-                    "suggestedEntities": rules.suggested_entities(self._events, self._decisions, self._case["entities"])[:10],
+                    "suggestedEntities": rules.suggested_entities(self._events, self._decisions, self._case["entities"])[:6],
                 }
             return {"case": case, "suggestion": self._suggestion}
 
