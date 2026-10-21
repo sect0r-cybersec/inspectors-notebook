@@ -2,6 +2,11 @@
 
 Sections 1 and 2 are done: the Defender XDR and Sentinel query rules in `extension/src/parsers/` were written from lab captures on 21 October 2026, with sanitised fixtures in `extension/tests/fixtures/`. Still open: section 3, incident and alert URLs, because the lab had no incidents to capture. Until then incident IDs are not read. Re-run sections 1 and 2 if a console update breaks query capture.
 
+**Deferred S3 exit items (owner's decision, 21 October 2026).** S3 moves on without these, because the lab has no incidents yet:
+
+- Incident and alert URL patterns (section 3). Until they exist, incident IDs are not read, so S4's start detection (FR-2, FR-3) cannot recognise incident pages.
+- The 20-query check (last section).
+
 Use the lab tenant only. Never capture from a client tenant.
 
 ## 1. Advanced hunting (Defender XDR)
