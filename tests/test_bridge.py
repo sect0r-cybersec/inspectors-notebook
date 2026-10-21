@@ -61,7 +61,7 @@ def test_hello_is_answered_and_counted(setup):
     bridge, client, updates, _ = setup
     c = client()
     c.send({"type": "hello", "browser": "chrome"})
-    assert c.receive() == {"type": "status", "recording": False}
+    assert c.receive() == {"type": "status", "recording": False, "screenshots": True, "interval": 0}
     assert wait_for(lambda: bridge.listener() == {"browsers": 1, "tabs": 0})
 
 
@@ -141,16 +141,22 @@ def test_screenshots_are_captured_into_the_case_only_while_recording(setup):
     assert (shot["kind"], shot["trigger"], shot["file"]) == ("screenshot", "navigation", "screenshots/000001.webp")
 
 
+def status(recording):
+    return {"type": "status", "recording": recording, "screenshots": True, "interval": 0}
+
+
 def test_browsers_hear_when_recording_starts_and_stops(setup):
     bridge, client, _, _ = setup
     c = client()
     c.send({"type": "hello", "browser": "chrome"})
-    assert c.receive() == {"type": "status", "recording": False}
-    bridge.set_recording(True)
-    assert c.receive() == {"type": "status", "recording": True}
-    bridge.set_recording(True)  # no change, no message
-    bridge.set_recording(False)
-    assert c.receive() == {"type": "status", "recording": False}
+    assert c.receive() == status(False)
+    bridge._cases.start()
+    bridge.update_status()
+    assert c.receive() == status(True)
+    bridge.update_status()  # no change, no message
+    bridge._cases.stop()
+    bridge.update_status()
+    assert c.receive() == status(False)
 
 
 def test_capture_events_go_to_the_case(setup):
@@ -158,7 +164,7 @@ def test_capture_events_go_to_the_case(setup):
     bridge._cases.start(entities=["HOST-12"])
     c = client()
     c.send({"type": "hello", "browser": "chrome"})
-    assert c.receive() == {"type": "status", "recording": True}
+    assert c.receive() == status(True)
     c.send({"type": "event", "kind": "query", "query": "DeviceInfo | where DeviceName == 'HOST-12'"})
     assert wait_for(lambda: len(bridge._cases.events()) == 1)
     assert bridge._cases.events()[0][1].reason == "entity"

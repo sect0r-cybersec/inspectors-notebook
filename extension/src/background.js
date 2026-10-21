@@ -60,7 +60,9 @@ function onRelayMessage(message) {
     setState({ app: message.app, recording: message.app === "connected" ? state.recording : null });
   }
   if ("recording" in message) {
-    // The companion's answer to our hello; report what we are listening to.
+    // The companion's answer to our hello, and its updates; report what we listen to.
+    capture.screenshots = message.screenshots !== false;
+    capture.interval = Number(message.interval) || 0;
     setState({ recording: Boolean(message.recording) });
     reportTabs();
   }
@@ -68,6 +70,7 @@ function onRelayMessage(message) {
 
 function setState(changes) {
   Object.assign(state, changes);
+  scheduleIntervalShots(); // interval screenshots run only while recording
   const look = state.app !== "connected" ? "closed" : state.recording ? "recording" : "connected";
   const title = {
     closed: state.app === "unavailable" ? "Inspector: relay not installed" : "Inspector: app closed",
@@ -162,12 +165,25 @@ async function onCapture(payload, tab) {
 // results. Browsers only let an extension capture tabs if it may read every website,
 // so the companion captures the browser window instead; it also skips unchanged pages.
 let lastRequestAt = 0;
+// The companion's screenshot settings: on key events, plus every interval seconds when set.
+const capture = { screenshots: true, interval: 0 };
+let intervalTimer = null;
+
+function scheduleIntervalShots() {
+  clearInterval(intervalTimer);
+  intervalTimer = null;
+  if (!state.recording || !capture.screenshots || capture.interval <= 0) return;
+  intervalTimer = setInterval(async () => {
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    if (tab) screenshot(tab, "interval");
+  }, capture.interval * 1000);
+}
 const REQUEST_GAP_MS = 500;
 
 async function screenshot(tab, trigger) {
   try {
     const console_ = consoleFor(tab?.url);
-    if (state.app !== "connected" || !state.recording || !tab.active || !console_) return;
+    if (state.app !== "connected" || !state.recording || !capture.screenshots || !tab.active || !console_) return;
     if ((await pausedTabs()).has(tab.id)) return;
     const wait = lastRequestAt + REQUEST_GAP_MS - Date.now();
     lastRequestAt = Math.max(Date.now(), lastRequestAt + REQUEST_GAP_MS);

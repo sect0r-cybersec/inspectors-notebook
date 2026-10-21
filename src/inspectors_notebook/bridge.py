@@ -14,6 +14,7 @@ from typing import Callable
 from . import pipe
 from .cases import CaseManager
 from .screenshot import Screenshotter
+from .settings import Settings
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class Bridge:
         on_show: Callable[[], None],
         screenshotter: Screenshotter | None = None,
         cases: CaseManager | None = None,
+        settings: Callable[[], Settings] = Settings,
     ):
         self._server = server
         self._on_listener = on_listener
@@ -37,7 +39,8 @@ class Bridge:
         self._next_id = 0
         self._shooter = screenshotter
         self._cases = cases
-        self._recording = False
+        self._settings = settings
+        self._status: dict | None = None
         self._shot_requests: queue.Queue = queue.Queue(maxsize=8)
         self.events_received = 0
         self.screenshots_taken = 0
@@ -63,16 +66,21 @@ class Bridge:
     def _is_recording(self) -> bool:
         return bool(self._cases and self._cases.recording)
 
-    def set_recording(self, recording: bool) -> None:
-        """Tell every connected browser when a case starts or stops recording."""
+    def _status_message(self) -> dict:
+        s = self._settings()
+        return {"type": "status", "recording": self._is_recording(), "screenshots": s.screenshots, "interval": s.interval_seconds}
+
+    def update_status(self) -> None:
+        """Tell every connected browser when recording or the screenshot settings change."""
+        status = self._status_message()
         with self._lock:
-            if recording == self._recording:
+            if status == self._status:
                 return
-            self._recording = recording
+            self._status = status
             conns = [c["conn"] for c in self._clients.values() if c["browser"]]
         for conn in conns:
             try:
-                conn.send({"type": "status", "recording": recording})
+                conn.send(status)
             except pipe.PipeError:
                 pass  # that browser is going away; its reader thread cleans up
 
@@ -120,7 +128,7 @@ class Bridge:
             with self._lock:
                 self._clients[cid]["browser"] = browser
             log.info("%s connected", browser)
-            conn.send({"type": "status", "recording": self._is_recording()})
+            conn.send(self._status_message())
             self._notify()
         elif kind == "tabs":
             count = message.get("count")

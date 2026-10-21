@@ -101,7 +101,7 @@ def main() -> None:
     bridge = Bridge(server, on_listener, on_show, Screenshotter(), cases)
 
     def on_cases_changed() -> None:
-        bridge.set_recording(cases.recording)
+        bridge.update_status()
         push_state()
 
     def dock_and_show() -> None:
