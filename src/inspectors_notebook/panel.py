@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable, Protocol
 
-from . import desktop, export, timeline
+from . import attack, desktop, export, timeline
 from . import settings as settings_store
 from .cases import CaseManager
 from .geometry import RAIL_WIDTH, Layout, clamp_width
@@ -109,6 +109,14 @@ class PanelApi:
     def comment_item(self, ids: list, text: str) -> dict:
         self._cases.set_annotation(int(ids[0]), str(text))
         return self.get_state()
+
+    def tag_item(self, ids: list, tactics: list) -> dict:
+        self._cases.set_tactics(int(ids[0]), tactics if isinstance(tactics, list) else [])
+        return self.get_state()
+
+    def tactics(self) -> dict:
+        """Every ATT&CK tactic the analyst can tag, in the matrix's order."""
+        return {"version": attack.VERSION, "tactics": [{"id": t, "name": name} for t, name in attack.TACTICS.items()]}
 
     def pin_item(self, ids: list, pinned: bool) -> dict:
         self._cases.set_pin(int(ids[0]), bool(pinned))
