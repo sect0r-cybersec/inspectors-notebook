@@ -27,7 +27,7 @@ _RANK = {KEEP: 0, REVIEW: 1, HIDE: 2}
 @dataclass
 class Item:
     ids: list[int]
-    kind: str  # record, page, query, note, screenshot, result
+    kind: str  # record, page, query, note, screenshot, result, window, desktop
     ts: str
     label: str
     text: str = ""
@@ -200,6 +200,12 @@ def _item(event: dict) -> Item:
                     trigger=event.get("trigger") or "", **common)
     if kind == "result":  # a result whose query was not captured
         return Item(kind="result", label="Results", result=event, **common)
+    if kind == "desktop_window":  # switched to an allowed app (S9)
+        return Item(kind="window", label=event.get("app") or "Window", text=event.get("title") or "", **common)
+    if kind == "desktop_text":
+        approximate = " (OCR, approximate)" if event.get("method") == "ocr" else ""
+        return Item(kind="desktop", label=f"{event.get('app') or 'Desktop'}{approximate}", text=event.get("title") or "",
+                    code=str(event.get("text") or ""), **common)
     return Item(kind=str(kind), label=str(kind).capitalize(), **common)
 
 

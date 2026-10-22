@@ -30,7 +30,7 @@ from .case_store import CaseStore, default_root
 from .rules import HIDE, KEEP, REVIEW, CaseContext
 
 FORMAT = 1
-LABELLED_KINDS = ("record", "page", "query", "result")  # notes and screenshots are the analyst's own
+LABELLED_KINDS = ("record", "page", "query", "result", "window", "desktop")  # notes and screenshots are the analyst's own
 COLUMNS = ["key", "time", "kind", "event", "entity_match", "rules", "relevant", "notable", "comment"]
 STATE_LIMIT = 1200  # characters; keeps the model's input near FR-22's 150 to 250 tokens
 REVIEW_BAND = (0.3, 0.7)  # MJ-5: borderline scores go to review, never straight to hidden
@@ -61,6 +61,10 @@ def event_summary(item: timeline.Item) -> str:
             if rows:
                 text += " First row: " + ", ".join(f"{c}={v}" for c, v in zip(columns, rows[0]))
         return text
+    if item.kind == "window":
+        return f"Switched to {item.label}: '{item.text}'."
+    if item.kind == "desktop":
+        return f"Text on screen in {item.label}, window '{item.text}':\n{item.code}"
     return f"{item.label}: {item.text}"
 
 

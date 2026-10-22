@@ -18,7 +18,7 @@ from .rules import KEEP
 from .timeline import Item
 
 CONSOLE_NAMES = {"defender": "Defender XDR", "sentinel": "Sentinel"}
-TAGS = {"page": "PAGE", "query": "QUERY", "note": "NOTE", "screenshot": "SHOT", "result": "RESULT"}
+TAGS = {"page": "PAGE", "query": "QUERY", "note": "NOTE", "screenshot": "SHOT", "result": "RESULT", "window": "WINDOW", "desktop": "DESKTOP"}
 TAG_WIDTH = 9  # INCIDENT plus a space
 INDENT = " " * (7 + TAG_WIDTH)  # under the text after "HH:MM  TAG      "
 CELL_WIDTH = 60
@@ -76,6 +76,10 @@ def headline(item: Item, entities: list[str], opts: Options) -> str:
         return item.text
     if item.kind == "screenshot":
         return f"[screenshot {screenshot_name(item, opts.tz)}]"
+    if item.kind == "window":
+        return f"{item.label}: {item.text}" if item.text else item.label
+    if item.kind == "desktop":
+        return f"Text in {item.label}"
     return item.text or item.label
 
 
@@ -150,7 +154,7 @@ def _text(case, items, findings, entities, opts) -> str:
         out += ["TIMELINE", ""]
         for item in items:
             out.append(f"{timeline.clock(item.ts, opts.tz, opts.utc)}  {tag(item):<{TAG_WIDTH}}{headline(item, entities, opts)}")
-            if item.kind == "query":
+            if item.code:  # a query, or text captured from a desktop app
                 out += [INDENT + line for line in item.code.splitlines()]
             if item.result:
                 out.append(f"{INDENT}Result: {timeline.summary_line(item.result, entities, opts.tz, opts.utc)}")
@@ -179,7 +183,7 @@ def _markdown(case, items, findings, entities, opts) -> str:
         out += ["## Timeline", ""]
         for item in items:
             out.append(f"- **{timeline.clock(item.ts, opts.tz, opts.utc)}** {entry_line(item, entities, opts)}")
-            if item.kind == "query":
+            if item.code:
                 out += ["", f"  ```{(item.language or '').lower()}"] + [f"  {line}" for line in item.code.splitlines()] + ["  ```"]
             if item.result:
                 out += ["", f"  Result: {timeline.summary_line(item.result, entities, opts.tz, opts.utc)}"]
@@ -189,7 +193,7 @@ def _markdown(case, items, findings, entities, opts) -> str:
                     out += ["  | " + " | ".join(map(_md_cell, row)) + " |" for row in cells]
             if item.annotation:
                 out += ["", f"  Comment: {item.annotation}"]
-            if item.kind == "query" or item.result or item.annotation:
+            if item.code or item.result or item.annotation:
                 out.append("")
     return "\n".join(out).rstrip() + "\n"
 
@@ -223,7 +227,7 @@ def _html(case, items, findings, entities, opts) -> str:
         out += ["<h2>Timeline</h2>", "<ol>"]
         for item in items:
             out.append(f"<li><time>{e(timeline.clock(item.ts, opts.tz, opts.utc))}</time>{e(entry_line(item, entities, opts))}")
-            if item.kind == "query":
+            if item.code:
                 out.append(f"<pre><code>{e(item.code)}</code></pre>")
             if item.result:
                 out.append(f"<p>Result: {e(timeline.summary_line(item.result, entities, opts.tz, opts.utc))}</p>")
