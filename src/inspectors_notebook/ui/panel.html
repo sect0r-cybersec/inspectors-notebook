@@ -185,6 +185,16 @@
     <label class="check"><input type="checkbox" data-setting="screenshots">On key events (navigation, tab switch, results)</label>
     <label class="check"><input type="checkbox" class="interval-on">Also every <input type="number" min="15" max="3600" class="interval-seconds" aria-label="Interval in seconds"> sec</label>
 
+    <h2 class="section-title">Desktop apps</h2>
+    <label class="check"><input type="checkbox" data-setting="desktop_capture">Capture text from these apps while a case is recording</label>
+    <ul class="desktop-apps"></ul>
+    <div class="add-app">
+      <label for="app-picker" class="visually-hidden">Open app to allow</label>
+      <select id="app-picker" class="app-picker"></select>
+      <button class="outline small" data-desktop="add">Allow</button>
+    </div>
+    <p class="faint">Only the window in front is read. Terminals and most apps are read exactly; remote desktop and VDI windows with Windows' own OCR, which is approximate. Nothing leaves this PC.</p>
+
     <h2 class="section-title">Case cache</h2>
     <label class="number">Keep the last <input type="number" min="1" max="50" data-setting="cache_size"> cases</label>
     <label class="check"><input type="checkbox" data-setting="warn_unexported">Ask before deleting a case that was never exported</label>

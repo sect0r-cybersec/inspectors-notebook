@@ -555,7 +555,10 @@ const SHORTCUTS = {
   panel: ["Ctrl+Alt+I", "Show or collapse the panel"],
 };
 
+let settings = null;
+
 function renderSettings(s) {
+  settings = s;
   $(".settings-listener").textContent = listenerText(state.listener);
   for (const b of document.querySelectorAll("button[data-setting]")) b.setAttribute("aria-checked", String(s[b.dataset.setting] === b.dataset.value));
   for (const input of document.querySelectorAll("input[data-setting]")) {
@@ -571,10 +574,33 @@ function renderSettings(s) {
     li.append(el("span", "mono", keys), el("span", held ? "held" : "", held ? `${what} (held by another program, so off)` : what));
     return li;
   }));
+  $(".desktop-apps").replaceChildren(...s.desktop_apps.map((app) => {
+    const li = el("li");
+    const actions = el("span", "row-actions");
+    const remove = el("button", "", "Remove");
+    remove.setAttribute("aria-label", `Stop capturing ${app}`);
+    remove.addEventListener("click", () => saveSetting({ desktop_apps: settings.desktop_apps.filter((a) => a !== app) }));
+    actions.append(remove);
+    li.append(el("span", "mono", app), actions);
+    return li;
+  }));
+}
+
+// Programs with a window open now, for the desktop allow list.
+async function loadOpenApps() {
+  const allowed = new Set((settings?.desktop_apps ?? []).map((a) => a.toLowerCase()));
+  const apps = (await api().desktop_open_apps()).filter(({ app }) => !allowed.has(app.toLowerCase()));
+  $(".app-picker").replaceChildren(...apps.map(({ app, title }) => {
+    const option = el("option", "", `${app} (${title})`);
+    option.value = app;
+    return option;
+  }));
+  $('[data-desktop="add"]').disabled = apps.length === 0;
 }
 
 async function loadSettings() {
   renderSettings(await api().get_settings());
+  await loadOpenApps();
 }
 
 async function saveSetting(changes) {
@@ -582,10 +608,15 @@ async function saveSetting(changes) {
   render(await api().get_state());
 }
 
-$(".view-settings").addEventListener("click", (event) => {
+$(".view-settings").addEventListener("click", async (event) => {
   const b = event.target.closest("button[data-setting]");
   if (b) saveSetting({ [b.dataset.setting]: b.dataset.value });
+  if (event.target.closest('[data-desktop="add"]') && $(".app-picker").value) {
+    await saveSetting({ desktop_apps: [...settings.desktop_apps, $(".app-picker").value] });
+    await loadOpenApps();
+  }
 });
+$(".app-picker").addEventListener("focus", loadOpenApps);
 $(".view-settings").addEventListener("change", (event) => {
   const input = event.target;
   if (input.classList.contains("interval-on") || input.classList.contains("interval-seconds")) {
