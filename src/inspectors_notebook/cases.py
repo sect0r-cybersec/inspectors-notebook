@@ -20,7 +20,7 @@ from typing import Callable
 from . import cache, rules
 from .case_store import CaseStore
 from .labelling import LabelQueue
-from .rules import KEEP, CaseContext, Decision
+from .rules import CaseContext, Decision
 from .settings import Settings
 from .timeline import parse_time
 
@@ -153,7 +153,7 @@ class CaseManager:
         if self._case.get("tenant") is None and item.get("tenant"):
             self._case["tenant"] = self._context.tenant = item["tenant"]
         decision = rules.decide(item, self._context, idle=item.get("idle", False), manual=self._disposition(item["id"]))
-        self._remember(item, decision)
+        rules.remember(item, decision, self._context)
         self._events.append(item)
         self._decisions.append(decision)
         self._store.append_event(self._case["id"], item)
@@ -232,23 +232,10 @@ class CaseManager:
     def _disposition(self, event_id: int) -> str | None:
         return self._marks.get(event_id, {}).get("disposition")
 
-    def _remember(self, item: dict, decision: Decision) -> None:
-        """Kept pages and queries make later identical ones duplicates (FR-18)."""
-        if decision.disposition != KEEP:
-            return
-        if item.get("kind") == "page_visit":
-            self._context.kept_pages.add(rules.page_key(item))
-        elif item.get("kind") == "query":
-            self._context.kept_queries.add(rules.query_key(item))
-
     def _rerun(self) -> None:
         """Apply the rules again from the start, after the entities or a decision changed (FR-21)."""
         self._context = CaseContext(entities=list(self._case["entities"]), tenant=self._case.get("tenant"))
-        self._decisions = []
-        for item in self._events:
-            decision = rules.decide(item, self._context, idle=item.get("idle", False), manual=self._disposition(item["id"]))
-            self._remember(item, decision)
-            self._decisions.append(decision)
+        self._decisions = rules.decide_all(self._events, self._context, manual=self._disposition)
 
     # Start detection (FR-3, FR-7, FR-8)
 

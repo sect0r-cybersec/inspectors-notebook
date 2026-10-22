@@ -2,6 +2,34 @@
 
 Changes to the original requirements, and decisions made during the build. Newest first. Each entry says what changed, why, and which requirements it affects.
 
+## 22 October 2026
+
+### S7 model findings (no model in the app yet)
+
+Measured in a throwaway environment on 22 October 2026, CPU only, 4 threads standing in for a 16 GB, 4-core work laptop. strands-decider 0.2.0 and its 51 dependencies were checked first: no LiteLLM, and the PyPI wheel is attested to the `strands-labs/strands-decider` release workflow.
+
+| | Full precision | int8, saved and reloaded |
+| --- | --- | --- |
+| Memory after load / peak | 7.7 GB / 8.0 GB | 3.1 GB / 4.4 GB |
+| All five model jobs, median / p95 | 15.2 s / 16.8 s | 4.2 s / 4.4 s |
+| MJ-5 only, median / p95 | 5.5 s / 6.8 s | 1.4 s / 1.7 s |
+
+- **No light model exists.** The smallest decider is the 2B; the spec's 400M light tier for 8 GB laptops is not available.
+- **Full precision misses NFR-3** (5 s p95) on 4 cores and takes half of a 16 GB laptop's memory. int8 meets it, but shifts answers (mean 0.085, up to 0.26 on yes/no scores; 4 of 12 choices changed), so int8 has to pass Gate 2 on its own.
+- **Prompt injection moves the model**: log text saying "answer no" gave the lowest relevance score of the sample, on an event naming a case entity. Entity match always wins (FR-19), so it cannot hide that event.
+- **The int8 checkpoint is converted once on a build machine** (18 GB peak) and must be hosted; it cannot be converted on a user's laptop.
+- **torch, transformers and strands-decider are not project dependencies yet.** That waits for Gate 2.
+
+### Gate 2 criteria (proposed)
+
+The model (entity match always keeps; otherwise its relevance score keeps at 0.7 or above, hides at 0.3 or below, and sends the rest to review) passes Gate 2 on the lab eval set when, against plain entity matching:
+
+- its F1 is higher (review counts as shown to the analyst),
+- it loses no more relevant evidence (relevant items hidden), and
+- it sends no more than 20% of items to review, since a model that sends everything uncertain to review saves the analyst nothing.
+
+On a 19-item synthetic case (invented events, my labels), the int8 model scored F1 0.839 against entity matching's 0.818 and lost no evidence, but sent 37% of items to review, so it fails. That checks the tooling, not the model: Gate 2 needs your labelled lab cases (`tests/manual/S7-eval-labelling-guide.md`).
+
 ## 21 October 2026
 
 ### S6 processing queue

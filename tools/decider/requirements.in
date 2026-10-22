@@ -1,0 +1,4 @@
+# Direct requirements of the decider tools; requirements.txt pins the full tree with hashes.
+strands-decider==0.2.0
+psutil
+safetensors

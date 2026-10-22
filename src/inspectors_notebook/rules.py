@@ -102,6 +102,26 @@ def decide(event: dict, case: CaseContext, *, idle: bool = False, manual: str | 
     return Decision(KEEP, "console", flags)
 
 
+def remember(event: dict, decision: Decision, case: CaseContext) -> None:
+    """Kept pages and queries make later identical ones duplicates (FR-18)."""
+    if decision.disposition != KEEP:
+        return
+    if event.get("kind") == "page_visit":
+        case.kept_pages.add(page_key(event))
+    elif event.get("kind") == "query":
+        case.kept_queries.add(query_key(event))
+
+
+def decide_all(events: list[dict], case: CaseContext, manual=lambda event_id: None) -> list[Decision]:
+    """The rules over a whole case in order, as when it is reopened or its entities change."""
+    decisions = []
+    for event in events:
+        decision = decide(event, case, idle=event.get("idle", False), manual=manual(event.get("id")))
+        remember(event, decision, case)
+        decisions.append(decision)
+    return decisions
+
+
 # Analysts pivot on these first; hashes are many per row, and a 40-character hex ID
 # (such as Defender's DeviceId) is indistinguishable from a SHA-1.
 SUGGESTION_ORDER = ["ipv4", "domain", "url", "email", "file", "sha256", "md5", "sha1"]
