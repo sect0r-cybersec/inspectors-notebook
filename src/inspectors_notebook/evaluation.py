@@ -34,6 +34,7 @@ LABELLED_KINDS = ("record", "page", "query", "result")  # notes and screenshots 
 COLUMNS = ["key", "time", "kind", "event", "entity_match", "rules", "relevant", "notable", "comment"]
 STATE_LIMIT = 1200  # characters; keeps the model's input near FR-22's 150 to 250 tokens
 REVIEW_BAND = (0.3, 0.7)  # MJ-5: borderline scores go to review, never straight to hidden
+MAX_REVIEW_SHARE = 0.2  # proposed: a model that sends everything to review saves the analyst nothing
 CONSOLE_NAMES = {"defender": "Defender", "sentinel": "Sentinel"}
 
 
@@ -183,6 +184,7 @@ def metrics(pairs: list[tuple[bool, str]]) -> dict:
         "hidden": sum(d == HIDE for _, d in pairs),
         "evidence_lost": sum(d == HIDE for d in relevant),  # relevant items hidden
         "noise_kept": sum(not r and d == KEEP for r, d in pairs),
+        "review_share": round(sum(d == REVIEW for _, d in pairs) / len(pairs), 3) if pairs else 0.0,
         "precision": round(precision, 3),
         "recall": round(recall, 3),
         "f1": round(2 * precision * recall / (precision + recall), 3) if precision + recall else 0.0,
@@ -204,8 +206,12 @@ def score(evalset: list[dict], predictions: dict[str, dict[str, dict]]) -> dict:
     baseline = result["entity matching"]
     for name in predictions:
         m = result[name]
-        # Gate 2 as proposed in docs/decisions.md: better F1 without losing more evidence.
-        m["gate2"] = m["f1"] > baseline["f1"] and m["evidence_lost"] <= baseline["evidence_lost"]
+        # Gate 2 as proposed in docs/decisions.md: better F1, no more evidence lost, little review.
+        m["gate2"] = (
+            m["f1"] > baseline["f1"]
+            and m["evidence_lost"] <= baseline["evidence_lost"]
+            and m["review_share"] <= MAX_REVIEW_SHARE
+        )
     return result
 
 
@@ -251,12 +257,12 @@ def main(argv: list[str] | None = None) -> None:
         predictions = {p.stem: {line["key"]: line for line in read_jsonl(p)} for p in args.predictions}
         result = score(evalset, predictions)
         print(f"{len(evalset)} items, {sum(e['relevant'] for e in evalset)} labelled relevant")
-        header = f"{'system':24} {'kept':>5} {'review':>6} {'hidden':>6} {'lost':>5} {'noise':>5} {'prec':>6} {'recall':>6} {'F1':>6}  gate 2"
+        header = f"{'system':24} {'kept':>5} {'review':>6} {'hidden':>6} {'lost':>5} {'noise':>5} {'review%':>7} {'prec':>6} {'recall':>6} {'F1':>6}  gate 2"
         print(header)
         for name, m in result.items():
             gate = {True: "pass", False: "fail"}.get(m.get("gate2"), "")
             print(f"{name:24} {m['kept']:>5} {m['review']:>6} {m['hidden']:>6} {m['evidence_lost']:>5} {m['noise_kept']:>5} "
-                  f"{m['precision']:>6} {m['recall']:>6} {m['f1']:>6}  {gate}")
+                  f"{m['review_share']:>7.0%} {m['precision']:>6} {m['recall']:>6} {m['f1']:>6}  {gate}")
 
 
 if __name__ == "__main__":

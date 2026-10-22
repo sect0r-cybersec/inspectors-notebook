@@ -110,14 +110,17 @@ def test_scoring_compares_each_system_against_entity_matching():
         {"key": "c:3", "relevant": False, "entity_match": False, "rules": KEEP},
         {"key": "c:4", "relevant": False, "entity_match": False, "rules": HIDE},
     ]
-    good = {"c:1": {"relevant": 0.1}, "c:2": {"relevant": 0.9}, "c:3": {"relevant": 0.5}, "c:4": {"relevant": 0.1}}
+    good = {"c:1": {"relevant": 0.1}, "c:2": {"relevant": 0.9}, "c:3": {"relevant": 0.2}, "c:4": {"relevant": 0.1}}
+    unsure = {"c:1": {"relevant": 0.5}, "c:2": {"relevant": 0.5}, "c:3": {"relevant": 0.5}, "c:4": {"relevant": 0.5}}
     bad = {"c:1": {"relevant": 0.9}, "c:2": {"relevant": 0.1}, "c:3": {"relevant": 0.9}, "c:4": {"relevant": 0.9}}
-    result = evaluation.score(evalset, {"good": good, "bad": bad})
+    result = evaluation.score(evalset, {"good": good, "bad": bad, "unsure": unsure})
 
     entity = result["entity matching"]
     assert (entity["kept"], entity["hidden"], entity["evidence_lost"], entity["recall"]) == (1, 3, 1, 0.5)
     assert result["rules"]["noise_kept"] == 1
-    assert (result["good"]["evidence_lost"], result["good"]["review"], result["good"]["gate2"]) == (0, 1, True)
+    assert (result["good"]["evidence_lost"], result["good"]["review"], result["good"]["gate2"]) == (0, 0, True)
+    # Sending everything uncertain to review loses nothing but saves the analyst nothing either.
+    assert (result["unsure"]["evidence_lost"], result["unsure"]["review_share"], result["unsure"]["gate2"]) == (0, 0.75, False)
     assert (result["bad"]["evidence_lost"], result["bad"]["gate2"]) == (1, False)
     with pytest.raises(ValueError, match="no prediction"):
         evaluation.score(evalset, {"partial": {"c:1": {"relevant": 0.5}}})
