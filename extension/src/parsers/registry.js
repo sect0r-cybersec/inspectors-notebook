@@ -78,11 +78,16 @@
     return generic ? { console: parser?.id ?? null, ...generic } : null;
   }
 
-  // pageUrl is the console page making the request; requestUrl is where it goes.
+  // pageUrl is the console page making the request; requestUrl is where it goes. A site
+  // with no console parser falls back to generic capture (parsers/generic.js), which
+  // decides from the request body; a console parser's own rules always win on its site.
   function matchQueryRequest(pageUrl, requestUrl, method) {
     const parser = parserFor(pageUrl);
-    if (!parser) return null;
     const verb = (method || "GET").toUpperCase();
+    if (!parser) {
+      const generic = globalThis.InspectorGenericParser;
+      return generic?.rule.methods.includes(verb) ? { parser: generic.parser, rule: generic.rule } : null;
+    }
     const rule = parser.queryRequests.find((r) => r.url.test(requestUrl) && (r.method ?? "POST") === verb);
     return rule ? { parser, rule } : null;
   }
@@ -96,10 +101,11 @@
     }
   }
 
-  // A reader that throws or returns nothing means "not a query": never guess.
+  // A reader that throws or returns nothing means "not a query": never guess. Readers get
+  // the parsed body, and the raw text for bodies that are not JSON.
   function readQuery(rule, body) {
     try {
-      const query = rule.query(parseJson(body));
+      const query = rule.query(parseJson(body), body);
       return typeof query === "string" && query.trim() ? query : null;
     } catch {
       return null;

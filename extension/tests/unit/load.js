@@ -6,6 +6,7 @@ import "../../src/incidents.js";
 import "../../src/parsers/registry.js";
 import "../../src/parsers/defender.js";
 import "../../src/parsers/sentinel.js";
+import "../../src/parsers/generic.js";
 import "../../src/page-hook.js";
 
 export const { localTimestamp } = globalThis.InspectorTime;

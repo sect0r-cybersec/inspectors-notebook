@@ -93,7 +93,8 @@ test("query requests match on page origin, request URL and method", () => {
   assert.equal(Parsers.matchQueryRequest(page, `${LAB_ORIGIN}/api/hunt`, "post")?.parser.id, "lab");
   assert.equal(Parsers.matchQueryRequest(page, `${LAB_ORIGIN}/api/hunt`, "GET"), null);
   assert.equal(Parsers.matchQueryRequest(page, `${LAB_ORIGIN}/api/other`, "POST"), null);
-  assert.equal(Parsers.matchQueryRequest("https://elsewhere.test/", `${LAB_ORIGIN}/api/hunt`, "POST"), null);
+  // A page no console parser claims falls back to generic capture (tests/unit/generic.test.js).
+  assert.equal(Parsers.matchQueryRequest("https://elsewhere.test/", `${LAB_ORIGIN}/api/hunt`, "POST")?.parser.id, "generic");
 });
 
 test("readers never guess", () => {
