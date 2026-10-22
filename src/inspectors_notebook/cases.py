@@ -240,18 +240,24 @@ class CaseManager:
     # Start detection (FR-3, FR-7, FR-8)
 
     def _detect_start(self, item: dict, now: float) -> bool:
+        dwell = self._dwell
+        suggesting = self._settings().suggest_cases and dwell and dwell["key"] not in self._dismissed
         if item.get("kind") == "page_visit" and item.get("incidentId"):
             key = (item.get("console"), item["incidentId"])
-            if not self._dwell or self._dwell["key"] != key:
+            # Opening a ticket, case or other record on another site while on an incident is
+            # an intent signal by itself (FR-3), whatever the ticketing system.
+            if suggesting and key[0] != dwell["key"][0]:
+                return self._suggest_start(dwell)
+            if not dwell or dwell["key"] != key:
                 self._dwell = {"key": key, "title": item.get("title"), "since": now}
             return False
-        dwell = self._dwell
-        if not self._settings().suggest_cases:
-            return False
-        if not dwell or dwell["key"] in self._dismissed or now - dwell["since"] < self._settings().dwell_seconds:
+        if not suggesting or now - dwell["since"] < self._settings().dwell_seconds:
             return False
         if item.get("kind") not in ("query", "page_visit"):
             return False
+        return self._suggest_start(dwell)
+
+    def _suggest_start(self, dwell: dict) -> bool:
         console, incident = dwell["key"]
         self._suggestion = {
             "kind": "start",

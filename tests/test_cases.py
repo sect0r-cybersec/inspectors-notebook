@@ -125,6 +125,34 @@ def test_start_suggested_after_dwell_then_pivot(manager, clock):  # FR-3
     assert manager.summary()["suggestion"] is None
 
 
+def test_opening_a_ticket_on_another_site_suggests_the_incident(manager, clock):  # FR-3
+    manager.ingest(visit("https://security.microsoft.com/incidents/4821", incident="4821"))
+    clock.advance(5)  # no dwell needed: opening the ticket is the signal
+    manager.ingest(visit("https://lab.service-now.com/incident.do?sys_id=7a1c", incident="7a1c", console="lab.service-now.com"))
+    suggestion = manager.summary()["suggestion"]
+    assert (suggestion["kind"], suggestion["console"], suggestion["incidentId"]) == ("start", "defender", "4821")
+
+
+def test_another_record_on_the_same_site_is_just_a_new_dwell(manager, clock):
+    manager.ingest(visit("https://security.microsoft.com/incidents/4821", incident="4821"))
+    clock.advance(5)
+    manager.ingest(visit("https://security.microsoft.com/incidents/4822", incident="4822"))
+    assert manager.summary()["suggestion"] is None
+    clock.advance(DWELL_SECONDS)
+    manager.ingest(query("DeviceInfo | take 5"))
+    assert manager.summary()["suggestion"]["incidentId"] == "4822"
+
+
+def test_a_ticket_after_a_dismissed_incident_does_not_suggest_it_again(manager, clock):
+    manager.ingest(visit("https://x/incidents/1", incident="1"))
+    clock.advance(DWELL_SECONDS)
+    manager.ingest(query("pivot"))
+    manager.dismiss_suggestion()
+    manager.ingest(visit("https://x/incidents/1", incident="1"))
+    manager.ingest(visit("https://tickets.lab/browse/SOC-9", incident="SOC-9", console="tickets.lab"))
+    assert manager.summary()["suggestion"] is None
+
+
 def test_dismissed_suggestions_stay_dismissed(manager, clock):
     manager.ingest(visit("https://x/incidents/1", incident="1"))
     clock.advance(DWELL_SECONDS)
