@@ -78,7 +78,7 @@ Filename: "{app}\{#RegisterExe}"; Parameters: "uninstall"; RunOnceId: "Unregiste
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
-    if SuppressibleMsgBox('Also delete your saved cases and settings?' + #13#10#13#10 +
+    if SuppressibleMsgBox('Also delete your saved cases, settings and logs?' + #13#10#13#10 +
         ExpandConstant('{localappdata}\InspectorsNotebook') + #13#10 +
         ExpandConstant('{userappdata}\InspectorsNotebook'),
         mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
