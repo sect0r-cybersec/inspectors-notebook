@@ -275,8 +275,21 @@ const ICONS = {
   restore: '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"></path><circle cx="12" cy="12" r="2.5"></circle>',
   pin: '<path d="M9 4h6l-1 6 3 3H7l3-3z"></path><path d="M12 13v7"></path>',
 };
+// FR-23: the event-type filter lists the kinds a case has, in this order.
+const KIND_NAMES = {
+  record: "Records",
+  page: "Pages",
+  query: "Queries",
+  result: "Results",
+  note: "Notes",
+  screenshot: "Screenshots",
+  window: "Window switches",
+  desktop: "Desktop text",
+};
 let view = "case";
 let tab = "keep";
+let eventType = "all";
+let typeOptions = { caseId: null, key: "" };
 let exportFormat = "text";
 
 function iconButton(name, label, onClick, pressed) {
@@ -296,10 +309,13 @@ function el(tag, className, text) {
   return node;
 }
 
-function inTab(item) {
-  if (tab === "findings") return item.star;
-  return item.disposition === tab;
+function inTab(item, name = tab) {
+  if (name === "all") return true;
+  if (name === "findings") return item.star;
+  return item.disposition === name;
 }
+
+const ofType = (item) => eventType === "all" || item.kind === eventType;
 
 function renderItem(item) {
   const li = el("li", item.star ? "item finding" : "item");
@@ -362,17 +378,31 @@ function renderTimeline(force = false) {
   const list = $(".timeline");
   const typing = list.contains(document.activeElement) && document.activeElement.tagName === "INPUT";
   if (typing && !force) return;
-  const items = state.timeline.filter(inTab);
+  const items = state.timeline.filter((item) => inTab(item) && ofType(item));
   list.replaceChildren(...items.map(renderItem));
-  if (!items.length) list.append(el("li", "timeline-empty", tab === "keep" ? "Nothing kept yet." : "Nothing here."));
+  if (!items.length) list.append(el("li", "timeline-empty", tab === "keep" && eventType === "all" ? "Nothing kept yet." : "Nothing here."));
+}
+
+function renderTypeFilter() {
+  const order = Object.keys(KIND_NAMES);
+  const rank = (kind) => (order.includes(kind) ? order.indexOf(kind) : order.length);
+  const kinds = [...new Set(state.timeline.map((item) => item.kind))].sort((a, b) => rank(a) - rank(b));
+  if (state.case.id !== typeOptions.caseId) eventType = "all"; // a new case starts unfiltered
+  const key = kinds.join(",");
+  // Rebuild only when the kinds change, so a capture doesn't close the list while it is open.
+  if (state.case.id === typeOptions.caseId && key === typeOptions.key) return;
+  typeOptions = { caseId: state.case.id, key };
+  const select = $("#event-type");
+  const option = (value, text) => Object.assign(el("option", "", text), { value });
+  select.replaceChildren(option("all", "All event types"), ...kinds.map((k) => option(k, KIND_NAMES[k] || k)));
+  select.value = eventType;
 }
 
 function renderTabs() {
-  const counts = state.case.counts;
-  const n = { keep: counts.keep, findings: counts.findings, review: counts.review, hide: counts.hide };
+  const items = state.timeline.filter(ofType);
   for (const b of document.querySelectorAll("[data-tab]")) {
     b.setAttribute("aria-pressed", String(b.dataset.tab === tab));
-    b.querySelector(".tab-count").textContent = n[b.dataset.tab];
+    b.querySelector(".tab-count").textContent = items.filter((item) => inTab(item, b.dataset.tab)).length;
   }
   $(".tab-help").hidden = !TAB_HELP[tab];
   $(".tab-help").textContent = TAB_HELP[tab] || "";
@@ -381,7 +411,7 @@ function renderTabs() {
 // Called at the end of renderCase.
 function renderTimelineArea() {
   const c = state.case;
-  for (const sel of [".tabs", ".timeline", ".case-footer"]) $(sel).hidden = !c;
+  for (const sel of [".tabs", ".type-filter", ".timeline", ".case-footer"]) $(sel).hidden = !c;
   const depth = c?.labelling || 0;
   $(".labelling").hidden = !depth;
   $(".labelling").textContent = depth === 1 ? "Labelling 1 event" : `Labelling ${depth} events`;
@@ -390,10 +420,17 @@ function renderTimelineArea() {
     if (view === "export") setView("case");
     return;
   }
+  renderTypeFilter();
   renderTabs();
   renderTimeline();
   if (view === "export") refreshPreview();
 }
+
+$("#event-type").addEventListener("change", (event) => {
+  eventType = event.target.value;
+  renderTabs();
+  renderTimeline(true);
+});
 
 document.addEventListener("click", (event) => {
   const b = event.target.closest("[data-tab]");
