@@ -7,10 +7,11 @@ missing or invalid keeps its current value (the default, on load).
 import json
 import logging
 import os
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Literal
 
+from .desktop import APP_NAME
 from .geometry import DEFAULT_WIDTH, MAX_WIDTH, MIN_WIDTH, DockMode, Side
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,9 @@ class Settings:
     # Times and exports (docs/decisions.md)
     show_utc: bool = False
     export_rows: int = 5
+    # Desktop capture (FR-45): off, and no apps allowed, until the analyst chooses
+    desktop_capture: bool = False
+    desktop_apps: list[str] = field(default_factory=list)
 
 
 CHOICES = {"side": ("left", "right"), "theme": ("dark", "light", "system"), "dock": ("appbar", "float")}
@@ -51,6 +55,7 @@ RANGES = {
     "export_rows": (0, 50),
 }
 INTERVAL_MIN = 15  # an interval below this is too frequent to be useful
+MAX_APPS = 20
 
 
 def changed(settings: Settings, changes: dict) -> Settings:
@@ -66,6 +71,10 @@ def changed(settings: Settings, changes: dict) -> Settings:
         elif isinstance(current, bool):
             if isinstance(value, bool):
                 valid[name] = value
+        elif isinstance(current, list):
+            # Program names, kept once each whatever their case, in the order given.
+            if isinstance(value, list) and len(value) <= MAX_APPS and all(isinstance(v, str) and APP_NAME.fullmatch(v) for v in value):
+                valid[name] = list({v.lower(): v for v in value}.values())
         elif isinstance(value, int) and not isinstance(value, bool):
             low, high = RANGES[name]
             value = max(low, min(high, value))
