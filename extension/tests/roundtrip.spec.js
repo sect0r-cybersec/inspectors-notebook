@@ -2,15 +2,20 @@
 // nothing is captured while the app is closed. Needs the relay registered
 // (uv run inspectors-notebook-register install) and the companion closed.
 import { chromium, expect, test } from "@playwright/test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { FakeCompanion } from "./fake-companion.js";
 
-const EXTENSION = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src");
+const SOURCE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src");
 const EXTENSION_ID = "ekjdcglidekbodkolhakfhleobcjidag";
 const CONSOLE = "https://security.microsoft.com";
+// A site the analyst adds with "Listen on this site". The browser's permission prompt
+// cannot be answered in a headless test, so the test copy of the extension has it granted
+// already; everything after the grant runs as it does for a real added site.
+const ADDED_SITE = "https://siem.lab.test";
+let extension;
 
 let fake;
 let context;
@@ -21,6 +26,11 @@ test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({}, testInfo) => {
   profile = mkdtempSync(join(tmpdir(), "inspector-ext-"));
+  extension = mkdtempSync(join(tmpdir(), "inspector-src-"));
+  cpSync(SOURCE, extension, { recursive: true });
+  const manifest = JSON.parse(readFileSync(join(SOURCE, "manifest.json"), "utf8"));
+  manifest.host_permissions.push(`${ADDED_SITE}/*`);
+  writeFileSync(join(extension, "manifest.json"), JSON.stringify(manifest, null, 2));
   // Chrome 137 and later ignore --load-extension; loading over CDP works in Chrome and Edge.
   context = await chromium.launchPersistentContext(profile, {
     channel: testInfo.project.use.channel,
@@ -29,7 +39,7 @@ test.beforeAll(async ({}, testInfo) => {
     args: ["--enable-unsafe-extension-debugging"],
   });
   const cdp = await context.browser().newBrowserCDPSession();
-  const { id } = await cdp.send("Extensions.loadUnpacked", { path: EXTENSION });
+  const { id } = await cdp.send("Extensions.loadUnpacked", { path: extension });
   expect(id).toBe(EXTENSION_ID);
   // Console pages are served locally: the tests never touch the real consoles. Each
   // path gets its own colour, so different pages look different in screenshots.
@@ -47,6 +57,7 @@ test.beforeAll(async ({}, testInfo) => {
 test.afterAll(async () => {
   await context?.close();
   rmSync(profile, { recursive: true, force: true });
+  rmSync(extension, { recursive: true, force: true });
 });
 
 // Each test gets a fresh companion; the relay reconnects to it and replays the hello.
@@ -251,6 +262,40 @@ test("Sentinel Logs queries are captured from the reactblade frame", async () =>
     expect(result).toMatchObject({ console: "sentinel", rowCount: 4 });
   } finally {
     for (const url of Object.keys(routes)) await context.unroute(url);
+  }
+});
+
+test("queries on an added site are captured without a console parser", async () => {
+  const sw = await background();
+  const registered = () => sw.evaluate(async () => (await chrome.scripting.getRegisteredContentScripts()).map((s) => s.id));
+  await context.route(`${ADDED_SITE}/**`, (route) => {
+    if (new URL(route.request().url()).pathname === "/api/search") {
+      return route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ columns: [{ name: "host.name" }, { name: "user.name" }], values: [["HOST-12", "jdoe"], ["HOST-07", "asmith"]] }),
+      });
+    }
+    return route.fulfill({ contentType: "text/html", body: "<title>Lab SIEM search</title>" });
+  });
+  try {
+    await sw.evaluate((origin) => chrome.storage.local.set({ sites: [origin] }), ADDED_SITE);
+    await expect.poll(registered).toEqual(["added-hook", "added-bridge"]);
+
+    const page = await context.newPage();
+    await page.goto(`${ADDED_SITE}/app/search`);
+    const body = JSON.stringify({ params: { query: 'FROM logs-* | WHERE user.name == "jdoe" | LIMIT 10' } });
+    await page.evaluate(async (b) => (await fetch("/api/search", { method: "POST", body: b })).json(), body);
+
+    const query = await fake.waitFor((m) => m.kind === "query");
+    expect(query).toMatchObject({ console: "siem.lab.test", language: "Query", query: 'FROM logs-* | WHERE user.name == "jdoe" | LIMIT 10' });
+    const result = await fake.waitFor((m) => m.kind === "result");
+    expect(result).toMatchObject({ console: "siem.lab.test", queryId: query.queryId, rowCount: 2, columns: ["host.name", "user.name"] });
+
+    // Removing the site removes the hook.
+    await sw.evaluate(() => chrome.storage.local.set({ sites: [] }));
+    await expect.poll(registered).toEqual([]);
+  } finally {
+    await context.unroute(`${ADDED_SITE}/**`);
   }
 });
 
