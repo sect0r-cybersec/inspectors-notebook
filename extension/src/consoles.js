@@ -3,8 +3,8 @@
 // Sites the extension listens on (FR-34). The consoles below ship with permission
 // (NFR-8); their ids match the console parsers in parsers/. The analyst can add any
 // other HTTPS site from the popup ("Listen on this site"), which asks the browser for
-// that site alone: added sites get page visits, incident detection and screenshots,
-// but not query capture, which needs a console parser.
+// that site alone: added sites get page visits, incident detection, screenshots and
+// generic query capture (parsers/generic.js); a console parser reads its site exactly.
 const CONSOLES = [
   { id: "defender", name: "Defender XDR", origin: "https://security.microsoft.com" },
   { id: "sentinel", name: "Azure portal", origin: "https://portal.azure.com" },

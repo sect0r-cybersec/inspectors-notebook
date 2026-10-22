@@ -8,7 +8,8 @@
   "permissions": [
     "nativeMessaging",
     "storage",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "https://security.microsoft.com/*",

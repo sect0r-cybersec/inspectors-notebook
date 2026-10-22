@@ -283,7 +283,29 @@ async function loadAddedSites() {
     if (await browser.permissions.contains({ origins: [`${origin}/*`] })) granted.push(origin);
   }
   setAddedSites(granted);
+  await registerCapture(granted);
   reportTabs();
+}
+
+// Added sites get the request hook too, so queries there are captured generically (S8).
+// The shipped consoles have theirs in the manifest. Tabs already open pick it up when
+// they next load.
+const ADDED_SCRIPTS = ["added-hook", "added-bridge"];
+
+async function registerCapture(origins) {
+  try {
+    const registered = await browser.scripting.getRegisteredContentScripts({ ids: ADDED_SCRIPTS });
+    if (registered.length) await browser.scripting.unregisterContentScripts({ ids: registered.map((s) => s.id) });
+    if (!origins.length) return;
+    const matches = origins.map((origin) => `${origin}/*`);
+    const common = { matches, runAt: "document_start", allFrames: true, persistAcrossSessions: false };
+    await browser.scripting.registerContentScripts([
+      { id: "added-hook", ...common, world: "MAIN", js: ["time.js", "entities.js", "parsers/registry.js", "parsers/generic.js", "page-hook.js"] },
+      { id: "added-bridge", ...common, js: ["vendor/browser-polyfill.min.js", "content.js"] },
+    ]);
+  } catch (error) {
+    console.warn("Inspector: query capture on added sites is unavailable", error);
+  }
 }
 
 browser.storage.onChanged.addListener((changes, area) => {

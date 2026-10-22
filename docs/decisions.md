@@ -4,6 +4,15 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ## 22 October 2026
 
+### S8: site-agnostic capture instead of Elastic and Falcon parsers
+
+Inspector is meant for any SIEM, EDR and ticketing system, not a list of named ones, and per-platform parsers need lab data from each platform. S8 builds the generic route instead; console parsers stay as the precise path where someone contributes one.
+
+- **Generic query capture on added sites** (`extension/src/parsers/generic.js`). On any site added with "Listen on this site" that has no console parser, a POST or PUT whose body holds a query-like field (`query`, `queryString`, `q`, `search`, `esql`, `kql`, `sql`, `spl` and similar) whose text reads like a query (a pipe, a query keyword, or a field compared with a value) is captured as a query. Results are read from common shapes: named columns with rows or values, a list of tables, search hits, or a list of records. Errors from `error` or `errors`. Plain words (a name lookup), GraphQL and anything unreadable are left alone: the page visit, incident detection and screenshots still happen. Replaces the planned Elastic and Falcon parsers (changes S8 and FR-16).
+- **Evidence**: the Defender and Sentinel lab captures read the same through generic capture as through their console parsers (same query text, row count, columns and entities). Elastic, LogScale, Splunk and other consoles are **UNTESTED**: their real request shapes have not been captured, and some (Kibana's internal search, which can stream compressed responses) may not be readable this way.
+- **The request hook is registered on added sites at runtime** (`scripting` permission, added to the manifest). Tabs already open pick it up when they next load. Verified in Chrome and Edge; Firefox is **UNTESTED** because its test runner cannot drive pages.
+- **Ticket triggers are generic too** (FR-3): opening a ticket, case or any record page on another listened site while on an incident suggests a case for that incident at once, without waiting for the dwell time. No per-ITSM rules, which settles the spec's open question on which ITSM to support first.
+
 ### S7 model findings (no model in the app yet)
 
 Measured in a throwaway environment on 22 October 2026, CPU only, 4 threads standing in for a 16 GB, 4-core work laptop. strands-decider 0.2.0 and its 51 dependencies were checked first: no LiteLLM, and the PyPI wheel is attested to the `strands-labs/strands-decider` release workflow.

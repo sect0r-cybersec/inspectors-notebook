@@ -26,8 +26,8 @@ Inspector's Notebook records what you do in security consoles during an investig
 - **A panel that stays out of the way.** Docks to the right or left screen edge and other windows make room for it. Collapse it to a 64 px rail, switch sides in one click, drag to resize, and pick a dark or light theme.
 - **Always listening, never recording without you.** The extension watches Defender XDR and Azure portal tabs, but nothing is captured unless the app is open.
 - **One click to start.** Open Inspector from the browser's toolbar popup and the app starts and connects.
-- **Works on any site you choose.** Inspector recognises incident, alert, case and ticket pages from their URL on any platform, and suggests starting a case when you dwell on one and start investigating. Defender XDR and Sentinel are listened to out of the box; add your SIEM, EDR or ticketing system with **Listen on this site** in the extension popup.
-- **Queries captured as you run them.** Advanced hunting in Defender XDR and Logs in Sentinel: the exact KQL, the row count, the columns, and the error if it fails. Entities such as IPs, hashes and files are picked out of the results.
+- **Works on any site you choose.** Inspector recognises incident, alert, case and ticket pages from their URL on any platform, and suggests starting a case when you dwell on one and start investigating, or open a ticket for it in your ticketing system. Defender XDR and Sentinel are listened to out of the box; add your SIEM, EDR or ticketing system with **Listen on this site** in the extension popup.
+- **Queries captured as you run them.** Advanced hunting in Defender XDR and Logs in Sentinel: the exact KQL, the row count, the columns, and the error if it fails. On sites you add, queries are captured generically from the search requests the page sends, without per-platform rules. Entities such as IPs, hashes and files are picked out of the results.
 - **Cases that sort themselves.** Start a case, add the hosts, users and IPs you care about, and every capture is kept, sent for review or hidden: anything that mentions a case entity is always kept, while duplicates, list pages, events from another tenant and anything captured while you were away are set aside. Nothing is deleted; hidden events can be restored.
 - **A timeline you can trust.** Newest first, with Timeline, Findings, Review and Hidden tabs. Star findings, comment on events, add notes, keep or hide anything in one click.
 - **Exports ready for the ticket.** Plain text, Markdown or HTML, copied or saved, with your findings first, each query's text, a summary line built from the data and the rows that name your entities. Pinned screenshots go in a zip named after their timeline entries.
@@ -92,6 +92,7 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 - [Timeline and export checklist](tests/manual/S5-timeline-export-checklist.md): the timeline, exports, the case cache, settings and shortcuts.
 - [Processing queue checklist](tests/manual/S6-processing-queue-checklist.md): bursts of captures, merged page reloads, and the measurements behind them.
 - [Gate 2 labelling guide](tests/manual/S7-eval-labelling-guide.md): labelling lab cases so the local model can be measured against entity matching.
+- [Any-site capture checklist](tests/manual/S8-any-site-checklist.md): query capture and ticket triggers on SIEMs, EDRs and ticketing systems you add.
 - [Installer checklist](tests/manual/installer-checklist.md): installing, upgrading and uninstalling on fresh Windows 10 and 11 machines.
 - [Decisions](docs/decisions.md): where the build departs from the original requirements, and why.
 
