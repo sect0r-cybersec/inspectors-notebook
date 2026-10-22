@@ -8,6 +8,7 @@ are this user's real ones, so they are saved first and put back afterwards. Clos
 before running: one companion runs per user.
 """
 
+import ctypes
 import json
 import queue
 import subprocess
@@ -127,6 +128,41 @@ def close_app(pid: int, timeout: float = 20) -> None:
     subprocess.run(["powershell", "-NoProfile", "-Command", script], timeout=timeout + 10)
 
 
+def has_visible_window(pid: int) -> bool:
+    found = []
+    user32 = ctypes.windll.user32
+    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+    def visit(hwnd, _):
+        owner = ctypes.c_ulong()
+        user32.GetWindowThreadProcessId(ctypes.c_void_p(hwnd), ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(ctypes.c_void_p(hwnd)):
+            found.append(hwnd)
+        return True
+
+    user32.EnumWindows(WNDENUMPROC(visit), 0)
+    return bool(found)
+
+
+def wait_for_panel(pid: int, timeout: float = 60) -> bool:
+    """The companion answers its pipe before its window is up; the panel follows once docked."""
+    deadline = time.monotonic() + timeout
+    while not has_visible_window(pid) and time.monotonic() < deadline:
+        time.sleep(0.5)
+    return has_visible_window(pid)
+
+
+def stop_apps(target: Path) -> list[int]:
+    """Closes the installed app as the user would, then forces any that would not close, so a
+    failing test doesn't leave it running into the next one. Returns those that had to be forced."""
+    for pid in app_processes(target):
+        close_app(pid)
+    left = app_processes(target)
+    for pid in left:
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+    return left
+
+
 class RelayProcess:
     """The installed relay, started the way a browser starts it."""
 
@@ -174,10 +210,13 @@ def test_the_installed_relay_starts_the_installed_app(installed):
         status = browser.next(timeout=10)
         assert status["type"] == "status" and status["recording"] is False
         [pid] = app_processes(installed)
+        assert wait_for_panel(pid), "the panel did not appear"
     finally:
-        assert browser.close() == 0
-    close_app(pid)
-    assert app_processes(installed) == []
+        try:
+            assert browser.close() == 0
+        finally:
+            forced = stop_apps(installed)
+    assert forced == []
 
 
 def test_a_second_launch_brings_the_first_forward(installed):
@@ -189,10 +228,15 @@ def test_a_second_launch_brings_the_first_forward(installed):
             break
         except pipe.PipeError:
             time.sleep(0.5)
-    second = subprocess.run([str(installed / "inspectors-notebook.exe")], timeout=30)
-    assert second.returncode == 0 and first.poll() is None
-    close_app(first.pid)
-    assert first.wait(timeout=5) == 0
+    try:
+        # Usually while the first is still starting: it answers the pipe before its window is up.
+        second = subprocess.run([str(installed / "inspectors-notebook.exe")], timeout=30)
+        assert second.returncode == 0 and first.poll() is None
+        assert wait_for_panel(first.pid), "the panel did not appear"
+        close_app(first.pid)
+        assert first.wait(timeout=5) == 0
+    finally:
+        stop_apps(installed)
 
 
 def test_upgrading_closes_the_running_app_and_keeps_the_registration(installed):

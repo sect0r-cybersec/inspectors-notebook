@@ -76,6 +76,8 @@ Restart any browser that was already open.
 
 Start the panel from the Start menu, with `uv run inspectors-notebook` from source, or click **Open Inspector** in the extension's toolbar popup. The panel docks to the screen edge and its status strip shows what the extension can see, for example `Extension listening in 2 tabs`. Close the panel from the taskbar or with Alt+F4.
 
+If something goes wrong, the app's log is in `%LOCALAPPDATA%\InspectorsNotebook\logs`. It records app events, not captured text, and never leaves your PC.
+
 To remove the browser registration of a from-source install:
 
 ```bash

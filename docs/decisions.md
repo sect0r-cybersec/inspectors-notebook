@@ -4,6 +4,12 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ## 22 October 2026
 
+### A log file, and answering browsers from the start
+
+The installer tests failed on 2 of about 12 CI runs. The relay reported the app as connected, but the app never replied. The cause: the app created its named pipe at once but only started reading it after WebView2 had loaded and the panel had docked. Until then a browser saw "connected" with nobody answering, a second launch gave up after 2 s, and a client that connected and left in that window stopped the app accepting connections at all (`ERROR_NO_DATA` from `ConnectNamedPipe`). Now the app answers the pipe as soon as it exists, and a client that leaves early is ignored.
+
+The panel has no console, so its log was lost. It now writes `%LOCALAPPDATA%\InspectorsNotebook\logs\inspectors-notebook.log` (1 MB, one old copy kept). If startup takes over 20 s, every thread's stack goes to `startup-hang-<pid>.txt` beside it. The log holds app events, never captured text or queries, and stays on the machine (NFR-1). CI keeps these files when the installer tests fail. Uninstall offers to delete them with the cases and settings.
+
 ### S9: desktop capture
 
 - **No new dependencies.** UI Automation comes from .NET Framework's managed client and OCR from Windows' own `Windows.Media.Ocr`, both reached through pythonnet, which pywebview already ships. Nothing is downloaded and nothing leaves the machine.

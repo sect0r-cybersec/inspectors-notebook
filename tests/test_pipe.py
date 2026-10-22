@@ -44,6 +44,18 @@ def test_round_trip_both_ways(server, name):
     conn.close()
 
 
+def test_a_client_that_left_before_the_server_accepted_does_not_stop_it(server, name):
+    # A second launch while the app is still starting connects, finds nobody answering, and leaves.
+    pipe.connect(name, timeout_ms=2000).close()
+    t, result = accept_in_background(server)
+    client = pipe.connect(name, timeout_ms=2000)
+    t.join(2)
+    client.send({"type": "show"})
+    assert result["conn"].receive() == {"type": "show"}
+    client.close()
+    result["conn"].close()
+
+
 def test_message_larger_than_buffer_arrives_whole(server, name):
     t, result = accept_in_background(server)
     client = pipe.connect(name, timeout_ms=2000)

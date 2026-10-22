@@ -32,6 +32,7 @@ ERROR_ACCESS_DENIED = 5
 ERROR_FILE_NOT_FOUND = 2
 ERROR_BROKEN_PIPE = 109
 ERROR_MORE_DATA = 234
+ERROR_NO_DATA = 232  # the client connected and left before the server accepted it
 ERROR_PIPE_BUSY = 231
 ERROR_PIPE_CONNECTED = 535
 ERROR_IO_PENDING = 997
@@ -285,6 +286,11 @@ class Server:
         handle = self._listening or self._create_instance()
         self._listening = 0
         code = _wait_connect(handle, self._stop)
+        while code == ERROR_NO_DATA and not self._closed:
+            # Someone connected while the app was still starting and has gone (a second
+            # launch, say). Free the instance for the next client instead of giving up.
+            DisconnectNamedPipe(handle)
+            code = _wait_connect(handle, self._stop)
         if code or self._closed:
             CloseHandle(handle)
             if self._closed:
