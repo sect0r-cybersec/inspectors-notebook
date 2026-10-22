@@ -12,7 +12,8 @@ from . import autostart, hotkeys, pipe, win32
 from . import settings as settings_store
 from .bridge import Bridge
 from .case_store import CaseStore, default_root
-from .cases import CaseManager
+from .cases import CaseManager, local_now
+from .desktop import DesktopCapture
 from .dock import Dock
 from .geometry import RAIL_WIDTH, Layout
 from .panel import PanelApi
@@ -143,6 +144,8 @@ def main() -> None:
         push_state()
 
     keys = hotkeys.Hotkeys({"note": lambda: call_page("focusNote()"), "record": on_record_key, "panel": on_panel_key})
+    # Text from desktop apps the analyst has allowed, while a case records (S9).
+    desktop = DesktopCapture(cases.ingest, lambda: cases.recording, lambda: settings, local_now)
 
     def dock_and_show() -> None:
         window.events.loaded -= dock_and_show
@@ -153,10 +156,12 @@ def main() -> None:
         loaded.set()
         refresher.start()
         bridge.start()
+        desktop.start()
         api._shortcuts_unavailable = [hotkeys.label(name) for name in keys.start()]
 
     def shut_down() -> None:
         keys.stop()
+        desktop.stop()
         cases.close()
         refresher.stop()
         bridge.stop()

@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable, Protocol
 
-from . import export, timeline
+from . import desktop, export, timeline
 from . import settings as settings_store
 from .cases import CaseManager
 from .geometry import RAIL_WIDTH, Layout, clamp_width
@@ -209,6 +209,10 @@ class PanelApi:
         return self._cases.cache_state()
 
     # Settings screen
+
+    def desktop_open_apps(self) -> list[dict]:
+        """Programs with a window open, for the desktop capture allow list (FR-45)."""
+        return desktop.open_apps()
 
     def get_settings(self) -> dict:
         with self._lock:

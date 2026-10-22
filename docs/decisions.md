@@ -4,6 +4,16 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ## 22 October 2026
 
+### S9: desktop capture
+
+- **No new dependencies.** UI Automation comes from .NET Framework's managed client and OCR from Windows' own `Windows.Media.Ocr`, both reached through pythonnet, which pywebview already ships. Nothing is downloaded and nothing leaves the machine.
+- **Any app, by the analyst's choice** (FR-45). Settings lists the programs with a window open; the analyst allows them by program name (such as `WindowsTerminal.exe` or `mstsc.exe`). No per-app rules. Off by default, with no apps allowed.
+- **Only the window in front, only while a case is recording.** Desktop text never goes into the pre-roll buffer, unlike browser events: what is on screen in a terminal or remote desktop is too broad to keep before the analyst has started a case.
+- **UI Automation first, OCR as the fallback** (FR-46). UI Automation reads the text on screen exactly. OCR reads RDP and VDI windows, which are pixels only, and is marked "OCR, approximate" in the timeline and export. Measured on a Windows Terminal window: UI Automation read `user jdoe on HOST-12 from 10.0.4.17` exactly; OCR dropped the IP at 1x, 2x and 3x scale and garbled it at 1.5x (`HOST?12 from 1@.@.4.17`). Entity matching on OCR text will miss what OCR misreads.
+- **Only new lines are sent.** Each look (every 3 seconds) sends the lines not on screen before, ignoring lines within OCR jitter of one already seen, so a repeated identical line is not sent twice. Switching to an allowed window is its own event; a title change is not, because terminals put each running command in the title.
+- **The same rules as browser events** (FR-47): text naming a case entity is kept as an entity match, idle-time text is hidden, and the model jobs see it in the eval set.
+- **Checked in the packaged build** (the installer's app folder): a terminal's text was captured exactly through UI Automation. OCR there, and RDP sessions and thick clients in the lab (the S9 exit test), are not checked yet.
+
 ### S8: site-agnostic capture instead of Elastic and Falcon parsers
 
 Inspector is meant for any SIEM, EDR and ticketing system, not a list of named ones, and per-platform parsers need lab data from each platform. S8 builds the generic route instead; console parsers stay as the precise path where someone contributes one.

@@ -32,6 +32,7 @@ Inspector's Notebook records what you do in security consoles during an investig
 - **A timeline you can trust.** Newest first, with Timeline, Findings, Review and Hidden tabs. Star findings, comment on events, add notes, keep or hide anything in one click.
 - **Exports ready for the ticket.** Plain text, Markdown or HTML, copied or saved, with your findings first, each query's text, a summary line built from the data and the rows that name your entities. Pinned screenshots go in a zip named after their timeline entries.
 - **A tidy case cache.** The last five cases are kept; older ones are removed, never the one you are working on or ones you pinned, and Inspector asks before removing a case you never exported.
+- **Terminals and remote desktops too.** Allow apps such as Windows Terminal or Remote Desktop in Settings and, while a case is recording, the text they show joins the timeline: read exactly where Windows exposes it, and with Windows' own OCR (approximate) for remote desktop windows. Off by default.
 - **Keyboard shortcuts from anywhere.** Ctrl+Alt+N adds a note, Ctrl+Alt+S starts or pauses a case, Ctrl+Alt+I shows or collapses the panel.
 - **Per-tab pause.** Stop capture in any console tab from the popup.
 - **Local only.** The browser and the app talk over a pipe only your Windows account can open. Nothing listens on a network port.
@@ -93,6 +94,7 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 - [Processing queue checklist](tests/manual/S6-processing-queue-checklist.md): bursts of captures, merged page reloads, and the measurements behind them.
 - [Gate 2 labelling guide](tests/manual/S7-eval-labelling-guide.md): labelling lab cases so the local model can be measured against entity matching.
 - [Any-site capture checklist](tests/manual/S8-any-site-checklist.md): query capture and ticket triggers on SIEMs, EDRs and ticketing systems you add.
+- [Desktop capture checklist](tests/manual/S9-desktop-capture-checklist.md): terminals, remote desktop sessions and thick clients in the lab.
 - [Installer checklist](tests/manual/installer-checklist.md): installing, upgrading and uninstalling on fresh Windows 10 and 11 machines.
 - [Decisions](docs/decisions.md): where the build departs from the original requirements, and why.
 
