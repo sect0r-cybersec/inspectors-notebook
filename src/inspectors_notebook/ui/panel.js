@@ -274,6 +274,7 @@ const ICONS = {
   hide: '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"></path><path d="M4 4l16 16"></path>',
   restore: '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"></path><circle cx="12" cy="12" r="2.5"></circle>',
   pin: '<path d="M9 4h6l-1 6 3 3H7l3-3z"></path><path d="M12 13v7"></path>',
+  tactic: '<path d="M3 12V4h8l10 10-8 8z"></path><circle cx="7.5" cy="7.5" r="1.5"></circle>',
 };
 // FR-23: the event-type filter lists the kinds a case has, in this order.
 const KIND_NAMES = {
@@ -329,6 +330,8 @@ function renderItem(item) {
   const actions = el("span", "item-actions");
   actions.append(iconButton("star", item.star ? "Remove from findings" : "Mark as a finding", act(() => api().star_item(item.ids, !item.star)), item.star));
   actions.append(iconButton("comment", "Comment", () => editComment(li, item)));
+  const tagged = item.tactics.length > 0;
+  actions.append(iconButton("tactic", tagged ? "Change ATT&CK tactics" : "Tag ATT&CK tactics", () => editTactics(li, item), tagged));
   if (item.kind === "screenshot") {
     actions.append(iconButton("pin", item.pinned ? "Leave out of the export" : "Include in the export", act(() => api().pin_item(item.ids, !item.pinned)), item.pinned));
   }
@@ -340,6 +343,12 @@ function renderItem(item) {
   if (item.text) li.append(el("div", "item-text", item.kind === "screenshot" ? `${item.text} · ${item.trigger}` : item.text));
   if (item.code) li.append(el("pre", "code", item.code));
   if (item.summary) li.append(el("div", "summary", item.summary));
+  if (tagged) {
+    const chips = el("div", "tactics");
+    chips.setAttribute("aria-label", "ATT&CK tactics");
+    for (const t of item.tactics) chips.append(Object.assign(el("span", "tactic", t.name), { title: `${t.name} (${t.id})` }));
+    li.append(chips);
+  }
   if (item.annotation) li.append(el("div", "comment", `Comment: ${item.annotation}`));
 
   if (item.disposition === "review") {
@@ -372,6 +381,39 @@ function editComment(li, item) {
   li.querySelector(".comment")?.remove();
   li.append(input);
   input.focus();
+}
+
+// ATT&CK tactic tags: the analyst picks; nothing is suggested. Checkboxes are inputs, so
+// captures arriving while the list is open don't re-render it away.
+let attackTactics = null;
+
+async function editTactics(li, item) {
+  attackTactics ??= await api().tactics();
+  if (li.querySelector(".tactic-picker")) return;
+  const chosen = new Set(item.tactics.map((t) => t.id));
+  const picker = el("fieldset", "tactic-picker");
+  picker.append(el("legend", "", `ATT&CK tactics (${attackTactics.version})`));
+  const list = el("div", "tactic-list");
+  for (const t of attackTactics.tactics) {
+    const label = el("label");
+    const box = Object.assign(document.createElement("input"), { type: "checkbox", value: t.id, checked: chosen.has(t.id) });
+    label.append(box, document.createTextNode(t.name));
+    label.title = t.id;
+    list.append(label);
+  }
+  const save = el("button", "", "Save");
+  const cancel = el("button", "", "Cancel");
+  save.addEventListener("click", async () => {
+    const ids = [...list.querySelectorAll("input:checked")].map((b) => b.value);
+    render(await api().tag_item(item.ids, ids));
+  });
+  cancel.addEventListener("click", () => renderTimeline(true));
+  picker.addEventListener("keydown", (e) => { if (e.key === "Escape") renderTimeline(true); });
+  const buttons = el("div", "row-actions");
+  buttons.append(save, cancel);
+  picker.append(list, buttons);
+  li.append(picker);
+  list.querySelector("input").focus();
 }
 
 function renderTimeline(force = false) {
