@@ -85,12 +85,15 @@ class Bridge:
                 pass  # that browser is going away; its reader thread cleans up
 
     def _serve(self) -> None:
-        while (conn := self._server.accept()) is not None:
-            with self._lock:
-                cid = self._next_id
-                self._next_id += 1
-                self._clients[cid] = {"browser": None, "tabs": 0, "conn": conn}
-            threading.Thread(target=self._client, args=(cid, conn), name=f"relay-{cid}", daemon=True).start()
+        try:
+            while (conn := self._server.accept()) is not None:
+                with self._lock:
+                    cid = self._next_id
+                    self._next_id += 1
+                    self._clients[cid] = {"browser": None, "tabs": 0, "conn": conn}
+                threading.Thread(target=self._client, args=(cid, conn), name=f"relay-{cid}", daemon=True).start()
+        except pipe.PipeError:
+            log.exception("Stopped accepting browser connections")
 
     def _client(self, cid: int, conn: pipe.Connection) -> None:
         try:

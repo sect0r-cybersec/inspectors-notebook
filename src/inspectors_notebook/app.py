@@ -8,7 +8,7 @@ from importlib import resources
 
 import webview
 
-from . import autostart, hotkeys, pipe, win32
+from . import autostart, diagnostics, hotkeys, pipe, win32
 from . import settings as settings_store
 from .bridge import Bridge
 from .case_store import CaseStore, default_root
@@ -40,25 +40,30 @@ def load_page(theme: str) -> str:
     return page.replace('data-theme="dark"', f'data-theme="{theme}"', 1)
 
 
-def show_running_instance(name: str) -> None:
+def show_running_instance(name: str) -> bool:
     try:
         conn = pipe.connect(name, timeout_ms=2000)
         conn.send({"type": "show"})
         conn.close()
+        return True
     except pipe.PipeError as e:
         log.warning("Inspector is already running but did not answer: %s", e)
+        return False
 
 
-def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+def main() -> int:
+    diagnostics.start()  # already started by the packaged app's launcher
 
     # One companion per user: a second launch just brings the first one forward.
     server = pipe.Server(pipe.default_pipe_name())
     try:
         server.listen()
     except pipe.AlreadyRunning:
-        show_running_instance(server.name)
-        return
+        log.info("Already running; showing that one")
+        shown = show_running_instance(server.name)
+        diagnostics.started()
+        return 0 if shown else 1
+    log.info("Pipe created")
 
     win32.enable_per_monitor_dpi()
 
@@ -101,6 +106,8 @@ def main() -> None:
 
     def on_show() -> None:
         api._expand()
+        if not loaded.is_set():
+            return  # still starting; the panel shows itself once docked
         window.show()
         push_state()
 
@@ -149,15 +156,18 @@ def main() -> None:
 
     def dock_and_show() -> None:
         window.events.loaded -= dock_and_show
+        log.info("Panel loaded; docking")
         hwnd = window.native.Handle.ToInt64()
         dock.start(hwnd, Layout(settings.side, settings.width, settings.dock), theme)
         dock.flush()
+        log.info("Docked")
         window.show()
         loaded.set()
         refresher.start()
-        bridge.start()
         desktop.start()
         api._shortcuts_unavailable = [hotkeys.label(name) for name in keys.start()]
+        log.info("Started")
+        diagnostics.started()
 
     def shut_down() -> None:
         keys.stop()
@@ -171,8 +181,14 @@ def main() -> None:
     window.events.loaded += dock_and_show
     window.events.closed += shut_down
     atexit.register(shut_down)
+    # Answer the browsers and any second launch at once, not only after WebView2 has loaded:
+    # until then the pipe exists but nobody reads it, so the relay shows "connected" to a
+    # companion that never replies.
+    bridge.start()
+    log.info("Serving the pipe; starting WebView2")
     webview.start(gui="edgechromium")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

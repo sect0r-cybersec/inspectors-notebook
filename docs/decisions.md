@@ -4,6 +4,27 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ## 22 October 2026
 
+### NFR-1: Inspector's own code is local only; WebView2 does its own housekeeping
+
+Measured with the packaged app (every TCP and UDP endpoint of the app and its child processes, and WebView2's own network log): Inspector's process opened no network connections, and the panel page requested nothing. WebView2, the Microsoft engine that draws the panel, contacted these by itself within 2 minutes of starting:
+
+| Host | What it is |
+| --- | --- |
+| `config.edge.skype.com` | Edge remote configuration and experiments, within 4 s |
+| `edge.microsoft.com` | Edge component updater, from about 60 s |
+| `msedge.b.tlu.dl.delivery.mp.microsoft.com` | component downloads for the updater |
+| `wpad` | proxy auto-discovery on the local network, because Windows' "Automatically detect settings" is on |
+
+None of these carries captured data. Chromium switches (`--disable-background-networking --disable-component-update --no-proxy-server`) stopped all of it in testing, but Microsoft advises against browser flags in production apps because they can change or disappear in any runtime update, so the app doesn't use them. The only supported control found is the WebView2 group policy `ExperimentationAndConfigurationServiceControl`, which IT can set for every WebView2 app on a machine; it covers the first host only. Nothing supported was found for the component updater.
+
+NFR-1 now reads: Inspector's own code makes no network calls and captured data never leaves the machine; the WebView2 runtime may contact the Microsoft hosts above. The installer tests check this on every CI run: the installed app runs for 2 minutes, Inspector's own process must open no endpoint, nothing in the app may listen on a port (NFR-5), and WebView2's network log may name only these hosts. A new host fails the build so it gets reviewed. The network log is switched on for the test only, through WebView2's documented `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` environment variable, or, where the app runs elevated as on CI runners (which ignore that variable), a machine-wide policy override for the exe that the test removes afterwards.
+
+### A log file, and answering browsers from the start
+
+The installer tests failed on 2 of about 12 CI runs. The relay reported the app as connected, but the app never replied. The cause: the app created its named pipe at once but only started reading it after WebView2 had loaded and the panel had docked. Until then a browser saw "connected" with nobody answering, a second launch gave up after 2 s, and a client that connected and left in that window stopped the app accepting connections at all (`ERROR_NO_DATA` from `ConnectNamedPipe`). Now the app answers the pipe as soon as it exists, and a client that leaves early is ignored.
+
+The panel has no console, so its log was lost. It now writes `%LOCALAPPDATA%\InspectorsNotebook\logs\inspectors-notebook.log` (1 MB, one old copy kept). If startup takes over 20 s, every thread's stack goes to `startup-hang-<pid>.txt` beside it. The log holds app events, never captured text or queries, and stays on the machine (NFR-1). CI keeps these files when the installer tests fail. Uninstall offers to delete them with the cases and settings.
+
 ### S9: desktop capture
 
 - **No new dependencies.** UI Automation comes from .NET Framework's managed client and OCR from Windows' own `Windows.Media.Ocr`, both reached through pythonnet, which pywebview already ships. Nothing is downloaded and nothing leaves the machine.

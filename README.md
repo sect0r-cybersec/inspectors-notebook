@@ -35,7 +35,7 @@ Inspector's Notebook records what you do in security consoles during an investig
 - **Terminals and remote desktops too.** Allow apps such as Windows Terminal or Remote Desktop in Settings and, while a case is recording, the text they show joins the timeline: read exactly where Windows exposes it, and with Windows' own OCR (approximate) for remote desktop windows. Off by default.
 - **Keyboard shortcuts from anywhere.** Ctrl+Alt+N adds a note, Ctrl+Alt+S starts or pauses a case, Ctrl+Alt+I shows or collapses the panel.
 - **Per-tab pause.** Stop capture in any console tab from the popup.
-- **Local only.** The browser and the app talk over a pipe only your Windows account can open. Nothing listens on a network port.
+- **Local only.** The browser and the app talk over a pipe only your Windows account can open. Nothing listens on a network port, and Inspector's own code makes no network calls. WebView2, the Microsoft engine that draws the panel, contacts Microsoft for its own configuration and updates; [Decisions](docs/decisions.md) lists those hosts.
 
 **Planned**
 
@@ -75,6 +75,8 @@ Restart any browser that was already open.
 ## Usage
 
 Start the panel from the Start menu, with `uv run inspectors-notebook` from source, or click **Open Inspector** in the extension's toolbar popup. The panel docks to the screen edge and its status strip shows what the extension can see, for example `Extension listening in 2 tabs`. Close the panel from the taskbar or with Alt+F4.
+
+If something goes wrong, the app's log is in `%LOCALAPPDATA%\InspectorsNotebook\logs`. It records app events, not captured text, and never leaves your PC.
 
 To remove the browser registration of a from-source install:
 
