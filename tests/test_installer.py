@@ -144,6 +144,14 @@ def has_visible_window(pid: int) -> bool:
     return bool(found)
 
 
+def wait_for_panel(pid: int, timeout: float = 60) -> bool:
+    """The companion answers its pipe before its window is up; the panel follows once docked."""
+    deadline = time.monotonic() + timeout
+    while not has_visible_window(pid) and time.monotonic() < deadline:
+        time.sleep(0.5)
+    return has_visible_window(pid)
+
+
 def stop_apps(target: Path) -> list[int]:
     """Closes the installed app as the user would, then forces any that would not close, so a
     failing test doesn't leave it running into the next one. Returns those that had to be forced."""
@@ -202,11 +210,7 @@ def test_the_installed_relay_starts_the_installed_app(installed):
         status = browser.next(timeout=10)
         assert status["type"] == "status" and status["recording"] is False
         [pid] = app_processes(installed)
-        # The companion answers before its window is up, so check the panel appears too.
-        deadline = time.monotonic() + 60
-        while not has_visible_window(pid) and time.monotonic() < deadline:
-            time.sleep(0.5)
-        assert has_visible_window(pid), "the panel did not appear"
+        assert wait_for_panel(pid), "the panel did not appear"
     finally:
         try:
             assert browser.close() == 0
@@ -225,8 +229,10 @@ def test_a_second_launch_brings_the_first_forward(installed):
         except pipe.PipeError:
             time.sleep(0.5)
     try:
+        # Usually while the first is still starting: it answers the pipe before its window is up.
         second = subprocess.run([str(installed / "inspectors-notebook.exe")], timeout=30)
         assert second.returncode == 0 and first.poll() is None
+        assert wait_for_panel(first.pid), "the panel did not appear"
         close_app(first.pid)
         assert first.wait(timeout=5) == 0
     finally:
