@@ -17,6 +17,7 @@ import threading
 import time
 import tomllib
 import winreg
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -283,8 +284,37 @@ def socket_endpoints() -> list[tuple[str, str, str, str, int]]:
     return rows
 
 
+@contextmanager
+def webview2_arguments(arguments: str):
+    """Extra WebView2 browser arguments for the app, for this test only. Yields the app's environment.
+
+    WebView2 ignores WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS when the app runs elevated, as it does
+    on CI runners, and honours a machine-wide (HKLM) policy override instead, named after the exe.
+    """
+    if not ctypes.windll.shell32.IsUserAnAdmin():
+        yield {**os.environ, "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": arguments}
+        return
+    path = r"SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
+    name = "inspectors-notebook.exe"
+    with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_READ | winreg.KEY_SET_VALUE) as key:
+        try:
+            previous = winreg.QueryValueEx(key, name)[0]
+        except FileNotFoundError:
+            previous = None
+        winreg.SetValueEx(key, name, 0, winreg.REG_SZ, arguments)
+        try:
+            yield dict(os.environ)
+        finally:
+            if previous is None:
+                winreg.DeleteValue(key, name)
+            else:
+                winreg.SetValueEx(key, name, 0, winreg.REG_SZ, previous)
+
+
 def net_log_hosts(path: Path) -> tuple[int, set[str]]:
     """Events in WebView2's network log, and every host they name."""
+    if not path.exists():
+        return 0, set()
     text = path.read_text(encoding="utf-8").rstrip()
     if not text.endswith("}"):  # still being written when read
         text = text.rstrip(",") + "]}"
@@ -301,10 +331,20 @@ def net_log_hosts(path: Path) -> tuple[int, set[str]]:
 
 def test_nothing_but_webview2_housekeeping_reaches_the_network(installed, tmp_path):
     net_log = tmp_path / "netlog.json"
-    # Test only: WebView2's own network log, through its documented environment variable.
-    env = {**os.environ, "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": f"--log-net-log={net_log} --net-log-capture-mode=Default"}
-    app = subprocess.Popen([str(installed / "inspectors-notebook.exe")], env=env)
     own, listening = set(), set()
+    # Test only: WebView2's own network log, through its documented override mechanisms.
+    with webview2_arguments(f"--log-net-log={net_log} --net-log-capture-mode=Default") as env:
+        app = subprocess.Popen([str(installed / "inspectors-notebook.exe")], env=env)
+        watch_network(installed, app, own, listening)
+    assert own == set(), "Inspector's own process opened network endpoints"
+    assert listening == set(), "something in the app listens on a port (NFR-5)"
+    events, hosts = net_log_hosts(net_log)
+    assert events > 0, "WebView2 wrote no network log; the check would prove nothing"
+    assert hosts <= WEBVIEW2_HOSTS, f"unexpected hosts: {sorted(hosts - WEBVIEW2_HOSTS)}"
+
+
+def watch_network(installed: Path, app: subprocess.Popen, own: set, listening: set) -> None:
+    """Records the app's own endpoints and any listening socket in its process tree, then closes it."""
     try:
         assert wait_for_panel(app.pid), "the panel did not appear"
         browser = pipe.connect(pipe.default_pipe_name(), timeout_ms=5000)
@@ -325,11 +365,6 @@ def test_nothing_but_webview2_housekeeping_reaches_the_network(installed, tmp_pa
         close_app(app.pid)
     finally:
         stop_apps(installed)
-    assert own == set(), "Inspector's own process opened network endpoints"
-    assert listening == set(), "something in the app listens on a port (NFR-5)"
-    events, hosts = net_log_hosts(net_log)
-    assert events > 0, "WebView2 wrote no network log; the check would prove nothing"
-    assert hosts <= WEBVIEW2_HOSTS, f"unexpected hosts: {sorted(hosts - WEBVIEW2_HOSTS)}"
 
 
 def test_upgrading_closes_the_running_app_and_keeps_the_registration(installed):
