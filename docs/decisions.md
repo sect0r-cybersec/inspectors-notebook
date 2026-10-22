@@ -4,6 +4,10 @@ Changes to the original requirements, and decisions made during the build. Newes
 
 ## 22 October 2026
 
+### ATT&CK tactic tags are the analyst's, never guessed
+
+The analyst tags any event with one or more Enterprise tactics. Inspector doesn't infer tactics from query text, table names or technique IDs: a guessed tactic in a ticket is worse than none, and the analyst knows why they ran a query. Tags store the tactic ID, which MITRE keeps stable, and show names from ATT&CK v20, which split Defense Evasion into Stealth (TA0005, the old ID) and Defense Impairment (TA0112, new in April 2026). The 15 tactics are in `attack.py`; no ATT&CK data is bundled. Exports show each item's tactics, findings carry theirs in brackets, and the header lists every tactic in the case in matrix order. Phase 3 breadth item.
+
 ### S9: desktop capture
 
 - **No new dependencies.** UI Automation comes from .NET Framework's managed client and OCR from Windows' own `Windows.Media.Ocr`, both reached through pythonnet, which pywebview already ships. Nothing is downloaded and nothing leaves the machine.
