@@ -91,12 +91,13 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 - [Cases checklist](tests/manual/S4-case-checklist.md): starting, pausing and stopping cases in the real app.
 - [Timeline and export checklist](tests/manual/S5-timeline-export-checklist.md): the timeline, exports, the case cache, settings and shortcuts.
 - [Processing queue checklist](tests/manual/S6-processing-queue-checklist.md): bursts of captures, merged page reloads, and the measurements behind them.
+- [Gate 2 labelling guide](tests/manual/S7-eval-labelling-guide.md): labelling lab cases so the local model can be measured against entity matching.
 - [Installer checklist](tests/manual/installer-checklist.md): installing, upgrading and uninstalling on fresh Windows 10 and 11 machines.
 - [Decisions](docs/decisions.md): where the build departs from the original requirements, and why.
 
 ## For developers
 
-The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) and stage 5 (timeline, export, case cache, settings) are built, followed by the installer. Stage 6 (processing queue) keeps the panel current through bursts of captures and queues events for the model, which comes in stage 7. Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
+The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) and stage 5 (timeline, export, case cache, settings) are built, followed by the installer. Stage 6 (processing queue) keeps the panel current through bursts of captures and queues events for the model, which comes in stage 7. Stage 7 starts with measurement: `inspectors-notebook-eval` builds an eval set from labelled lab cases, and the model joins the app only if it beats plain entity matching (Gate 2). Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
 
 | Path | What it holds |
 | --- | --- |
