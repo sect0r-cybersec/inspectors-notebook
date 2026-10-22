@@ -5,6 +5,8 @@ Automated coverage: `uv run pytest` (timeline items, exports against golden file
 ## Timeline
 
 - [ ] Timeline, Findings, Review and Hidden tabs show the right items, newest first, with counts.
+- [ ] All shows every item whatever its decision. **Show** narrows any tab to one event type, listing only the types in the case; the tab counts follow it, a capture arriving does not reset it, and a new case starts on All event types (FR-23).
+- [ ] At the narrowest width (320 px) each tab's count sits under its label and all five tabs fit; from the default 400 px they sit on one line.
 - [ ] The star marks a finding; the item turns amber and appears under Findings.
 - [ ] Comment: Enter saves, Escape cancels; typing is not interrupted while captures arrive.
 - [ ] Hide moves an item to Hidden; Restore brings it back.
