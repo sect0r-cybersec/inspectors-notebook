@@ -121,18 +121,22 @@ def test_an_unavailable_reader_is_skipped_and_not_retried():
     assert [e["kind"] for e in events] == ["desktop_window", "desktop_text"]
 
 
-def test_a_new_title_or_coming_back_is_a_new_window_event():
-    uia = FakeReader([None] * 4)
-    renamed = Window(TERMINAL.hwnd, TERMINAL.pid, TERMINAL.app, "jdoe@HOST-12: ~")
-    capture, events, state = make([TERMINAL, renamed, renamed, renamed], uia=uia)
+def test_switching_windows_is_an_event_but_a_running_commands_title_is_not():
+    uia = FakeReader([None] * 5)
+    running = Window(TERMINAL.hwnd, TERMINAL.pid, TERMINAL.app, "jdoe@lab: ~ - ping -n 5 10.0.4.17")
+    capture, events, state = make([TERMINAL, running, RDP, TERMINAL, TERMINAL], uia=uia)
     capture.poll()
+    capture.poll()  # same window, new title: no event
     capture.poll()
     capture.poll()
     state["recording"] = False
     capture.poll()
     state["recording"] = True
-    capture.poll()
-    assert [e["title"] for e in events] == ["jdoe@lab: ~", "jdoe@HOST-12: ~", "jdoe@HOST-12: ~"]
+    capture.poll()  # coming back after a pause is a switch again
+    assert [(e["app"], e["title"]) for e in events] == [
+        ("WindowsTerminal.exe", "jdoe@lab: ~"), ("mstsc.exe", "lab-dc01 - Remote Desktop Connection"),
+        ("WindowsTerminal.exe", "jdoe@lab: ~"), ("WindowsTerminal.exe", "jdoe@lab: ~"),
+    ]  # fmt: skip
 
 
 def test_long_text_is_capped():

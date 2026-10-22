@@ -213,7 +213,7 @@ class DesktopCapture:
         self._readers: dict[str, object | None] = {}
         self._interval = interval
         self._seq = 0
-        self._current: tuple[int, str] | None = None
+        self._current: int | None = None  # the window last switched to
         self._seen: dict[int, list[str]] = {}
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -275,8 +275,10 @@ class DesktopCapture:
         allowed = {a.lower() for a in s.desktop_apps}
         if not window or window.pid == os.getpid() or window.app.lower() not in allowed:
             return
-        if (window.hwnd, window.title) != self._current:
-            self._current = (window.hwnd, window.title)
+        # Switching windows is an event; a title change is not, since terminals show each
+        # running command in theirs. Text events carry the title of the moment.
+        if window.hwnd != self._current:
+            self._current = window.hwnd
             self._ingest(self._event("desktop_window", window))
         text, method = self._read(window)
         if text is None:
