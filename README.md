@@ -17,7 +17,7 @@ Inspector's Notebook records what you do in security consoles during an investig
   <img src="assets/mockup-live-case.png" alt="The Inspector's Notebook panel recording a case: incident header, entity chips, and a timeline of queries, notes and a highlighted finding" width="420">
 </p>
 
-> **Status:** early development. Phase 1 is built: the docked panel, the browser connection, Defender XDR and Sentinel query capture, cases, the timeline, notes and export. A per-user Windows installer is built and tested in CI. The processing queue that the local decision model will use is in place; the model comes next.
+> **Status:** early development. Phases 1 and 3 are built: the docked panel, the browser connection, query capture on Defender XDR, Sentinel and any site you add, cases, the timeline, notes, ATT&CK tags, export, and desktop capture. A per-user Windows installer is built and tested in CI. Inspector decides what to keep with rules only; the local model waits until it has been measured on labelled lab cases (Gate 2).
 
 ## Features
 
@@ -39,7 +39,7 @@ Inspector's Notebook records what you do in security consoles during an investig
 
 **Planned**
 
-- A local decision model that labels events, highlights findings and decides borderline events.
+- A local decision model that labels events, highlights findings and decides borderline events, once it beats plain entity matching on labelled lab cases (Gate 2).
 
 ## Quick start
 
@@ -102,7 +102,7 @@ The registration points at this folder's `.venv`, so run `install` again if you 
 
 ## For developers
 
-The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) and stage 5 (timeline, export, case cache, settings) are built, followed by the installer. Stage 6 (processing queue) keeps the panel current through bursts of captures and queues events for the model, which comes in stage 7. Stage 7 starts with measurement: `inspectors-notebook-eval` builds an eval set from labelled lab cases, and the model joins the app only if it beats plain entity matching (Gate 2). Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
+The project is built in stages, each finished with passing tests before the next starts. Stages 1 (panel) and 2 (relay and extension) are complete. Stage 3 (console parsers) captures Defender XDR and Sentinel queries; reading incident IDs from URLs needs a lab incident to capture. Stage 4 (cases and rules) and stage 5 (timeline, export, case cache, settings) are built, followed by the installer. Stage 6 (processing queue) keeps the panel current through bursts of captures and queues events for the model. Stage 7 measured the model and built the eval tools: `inspectors-notebook-eval` builds an eval set from labelled lab cases, and the model joins the app only if it beats plain entity matching (Gate 2); until then the app runs on rules alone. Stage 8 (capture on any site and ticket triggers) and stage 9 (desktop capture) are built. Decisions that changed the original requirements are in [docs/decisions.md](docs/decisions.md).
 
 | Path | What it holds |
 | --- | --- |
