@@ -29,4 +29,4 @@ Set up: Settings, **Desktop apps**: switch on **Capture text from these apps**, 
 
 ## Packaged build
 
-- [ ] The same terminal check in the installed app (from the installer), which has not been tested with desktop capture yet.
+- [ ] The remote desktop (OCR) check in the installed app. The terminal check passed in the packaged build on 22 October 2026; OCR has not been run there yet.
