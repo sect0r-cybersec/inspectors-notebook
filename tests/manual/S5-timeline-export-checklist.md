@@ -10,6 +10,7 @@ Automated coverage: `uv run pytest` (timeline items, exports against golden file
 - [ ] The star marks a finding; the item turns amber and appears under Findings.
 - [ ] Comment: Enter saves, Escape cancels; typing is not interrupted while captures arrive.
 - [ ] Hide moves an item to Hidden; Restore brings it back.
+- [ ] The tag button opens the 15 ATT&CK v20 tactics with the item's tags ticked; Save shows them as chips under the item, Cancel or Escape leaves them as they were, and a capture arriving while the list is open does not close it.
 - [ ] In Review, Keep and Hide decide the item, and **+ value** adds it as a case entity.
 - [ ] A screenshot item's pin includes it in the export and the zip.
 - [ ] The note box adds a timestamped note.
@@ -22,6 +23,7 @@ Automated coverage: `uv run pytest` (timeline items, exports against golden file
 - [ ] Screenshots (.zip) contains the pinned screenshots, named like their timeline entries.
 - [ ] After copying or saving, the case shows as Exported on the Cases screen.
 - [ ] With Show UTC on, times read `13:08 (12:08 UTC)` in the panel and the export.
+- [ ] Tagged items show `ATT&CK: Lateral Movement (TA0008)` in every format, findings show their tactics in brackets, and the header lists the case's tactics in matrix order.
 
 ## Cases
 

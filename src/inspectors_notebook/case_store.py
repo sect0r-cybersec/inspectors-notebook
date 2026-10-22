@@ -50,7 +50,7 @@ class CaseStore:
         self._append(case_id, "events.jsonl", event)
 
     def append_action(self, case_id: str, event_id: int, field: str, value) -> None:
-        """Record one change to an event: disposition, star, annotation or pin. None clears it."""
+        """Record one change to an event: disposition, star, annotation, pin or tactics. None clears it."""
         self._append(case_id, "actions.jsonl", {"event": event_id, "field": field, "value": value})
 
     def save_screenshot(self, case_id: str, event_id: int, data: bytes) -> str:

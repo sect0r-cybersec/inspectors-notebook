@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, tzinfo
 
+from . import attack
 from .rules import HIDE, KEEP, REVIEW, Decision
 
 MAX_COLUMNS = 6
@@ -41,6 +42,7 @@ class Item:
     flags: tuple = ()
     star: bool = False
     annotation: str = ""
+    tactics: tuple[str, ...] = ()  # ATT&CK tactic IDs the analyst tagged
     pinned: bool = False
     unlabelled: bool = False  # dropped from the labelling queue (FR-43)
     file: str = ""
@@ -175,6 +177,7 @@ def build(events: list[dict], decisions: list[Decision], marks: dict[int, dict])
         first = marks.get(item.ids[0], {})
         item.star = bool(first.get("star"))
         item.annotation = first.get("annotation", "")
+        item.tactics = tuple(attack.clean(first.get("tactics")))
         item.pinned = bool(first.get("pin"))
         item.unlabelled = any(marks.get(i, {}).get("unlabelled") for i in item.ids)
     return items
@@ -215,6 +218,7 @@ def view(item: Item, entities: list[str], tz: tzinfo | None = None, utc: bool = 
         "ids": item.ids, "kind": item.kind, "time": clock(item.ts, tz, utc), "label": item.label, "text": item.text,
         "code": item.code, "disposition": item.disposition, "reason": item.reason, "flags": list(item.flags),
         "star": item.star, "annotation": item.annotation, "pinned": item.pinned, "trigger": item.trigger,
+        "tactics": [{"id": t, "name": attack.TACTICS[t]} for t in item.tactics],
         "unlabelled": item.unlabelled,
     }
     if item.result:

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import timezone, tzinfo
 from pathlib import Path
 
-from . import timeline
+from . import attack, timeline
 from .rules import KEEP
 from .timeline import Item
 
@@ -91,11 +91,23 @@ def entry_line(item: Item, entities: list[str], opts: Options) -> str:
 
 def finding_line(item: Item, entities: list[str], opts: Options) -> str:
     if item.annotation:
-        return item.annotation
-    if item.kind == "query" and item.result:
+        line = item.annotation
+    elif item.kind == "query" and item.result:
         first = item.code.splitlines()[0] if item.code else item.label
-        return f"{first}: {timeline.summary_line(item.result, entities, opts.tz, opts.utc)}"
-    return headline(item, entities, opts)
+        line = f"{first}: {timeline.summary_line(item.result, entities, opts.tz, opts.utc)}"
+    else:
+        line = headline(item, entities, opts)
+    return f"{line} [{', '.join(attack.TACTICS[t] for t in item.tactics)}]" if item.tactics else line
+
+
+def tactics_line(item: Item) -> str:
+    return "ATT&CK: " + ", ".join(attack.label(t) for t in item.tactics)
+
+
+def case_tactics(items: list[Item]) -> str:
+    """Every tactic tagged in the export, in the matrix's order, or nothing."""
+    tagged = attack.clean([t for item in items for t in item.tactics])
+    return f"ATT&CK tactics ({attack.VERSION}): " + ", ".join(attack.TACTICS[t] for t in tagged) if tagged else ""
 
 
 def row_table(item: Item, entities: list[str], opts: Options) -> tuple[list[str], list[list[str]]]:
@@ -145,7 +157,8 @@ def render(case: dict, items: list[Item], opts: Options) -> str:
 
 def _text(case, items, findings, entities, opts) -> str:
     name, details, when = header(case, opts)
-    out = [" | ".join(name + details)] + ([when] if when else []) + [""]
+    tactics = case_tactics(items)
+    out = [" | ".join(name + details)] + ([when] if when else []) + ([tactics] if tactics else []) + [""]
     if findings:
         out.append("KEY FINDINGS")
         out += [f"{timeline.clock(i.ts, opts.tz, opts.utc)}  {finding_line(i, entities, opts)}" for i in findings]
@@ -160,6 +173,8 @@ def _text(case, items, findings, entities, opts) -> str:
                 out.append(f"{INDENT}Result: {timeline.summary_line(item.result, entities, opts.tz, opts.utc)}")
                 _, cells = row_table(item, entities, opts)
                 out += [INDENT + "  ".join(c for c in row if c) for row in cells]
+            if item.tactics:
+                out.append(INDENT + tactics_line(item))
             if item.annotation:
                 out.append(f"{INDENT}Comment: {item.annotation}")
     return "\n".join(out).rstrip() + "\n"
@@ -175,6 +190,8 @@ def _markdown(case, items, findings, entities, opts) -> str:
     meta = details + ([when] if when else [])
     if meta:
         out += [" · ".join(meta), ""]
+    if tactics := case_tactics(items):
+        out += [tactics, ""]
     if findings:
         out += ["## Key findings", ""]
         out += [f"- **{timeline.clock(i.ts, opts.tz, opts.utc)}** {finding_line(i, entities, opts)}" for i in findings]
@@ -191,9 +208,11 @@ def _markdown(case, items, findings, entities, opts) -> str:
                 if cells:
                     out += ["", "  | " + " | ".join(map(_md_cell, columns)) + " |", "  |" + " --- |" * len(columns)]
                     out += ["  | " + " | ".join(map(_md_cell, row)) + " |" for row in cells]
+            if item.tactics:
+                out += ["", f"  {tactics_line(item)}"]
             if item.annotation:
                 out += ["", f"  Comment: {item.annotation}"]
-            if item.code or item.result or item.annotation:
+            if item.code or item.result or item.annotation or item.tactics:
                 out.append("")
     return "\n".join(out).rstrip() + "\n"
 
@@ -219,6 +238,8 @@ def _html(case, items, findings, entities, opts) -> str:
     meta = details + ([when] if when else [])
     if meta:
         out.append(f"<p>{e(' · '.join(meta))}</p>")
+    if tactics := case_tactics(items):
+        out.append(f"<p>{e(tactics)}</p>")
     if findings:
         out += ["<h2>Key findings</h2>", "<ul>"]
         out += [f"<li><time>{e(timeline.clock(i.ts, opts.tz, opts.utc))}</time>{e(finding_line(i, entities, opts))}</li>" for i in findings]
@@ -236,6 +257,8 @@ def _html(case, items, findings, entities, opts) -> str:
                     out.append("<table><tr>" + "".join(f"<th>{e(h)}</th>" for h in columns) + "</tr>")
                     out += ["<tr>" + "".join(f"<td>{e(c)}</td>" for c in row) + "</tr>" for row in cells]
                     out.append("</table>")
+            if item.tactics:
+                out.append(f"<p>{e(tactics_line(item))}</p>")
             if item.annotation:
                 out.append(f"<p>Comment: {e(item.annotation)}</p>")
             out.append("</li>")

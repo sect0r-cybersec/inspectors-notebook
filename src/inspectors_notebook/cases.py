@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from . import cache, rules
+from . import attack, cache, rules
 from .case_store import CaseStore
 from .labelling import LabelQueue
 from .rules import CaseContext, Decision
@@ -62,7 +62,7 @@ class CaseManager:
         self._case: dict | None = None
         self._events: list[dict] = []
         self._decisions: list[Decision] = []
-        self._marks: dict[int, dict] = {}  # per event: disposition, star, annotation, pin
+        self._marks: dict[int, dict] = {}  # per event: disposition, star, annotation, pin, tactics
         self._context = CaseContext()
         self._paused = False
         self._elapsed = 0.0
@@ -499,6 +499,10 @@ class CaseManager:
 
     def set_annotation(self, event_id: int, text: str) -> None:
         self._mark(event_id, "annotation", str(text).strip()[:2000])
+
+    def set_tactics(self, event_id: int, tactics: list[str]) -> None:
+        """The analyst's ATT&CK tactic tags for an event; unknown IDs are dropped."""
+        self._mark(event_id, "tactics", attack.clean(tactics) or None)
 
     def set_pin(self, event_id: int, pinned: bool) -> None:
         """Include a screenshot in the export (FR-26)."""
