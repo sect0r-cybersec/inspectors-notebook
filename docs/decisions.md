@@ -2,6 +2,12 @@
 
 Changes to the original requirements, and decisions made during the build. Newest first. Each entry says what changed, why, and which requirements it affects.
 
+## 23 October 2026
+
+### Enrichment lookups come from sites the analyst adds
+
+FR-11 and FR-17 name enrichment sites (VirusTotal, AbuseIPDB and similar). Inspector doesn't ship with permission for them: like any other site, the analyst adds the ones they use with **Listen on this site**, which keeps NFR-8's default permissions to the two consoles. Once added, a lookup is a page visit like any other. These sites put the value looked up in the URL (`/gui/ip-address/203.0.113.7`, `/check/203.0.113.7`), so a lookup of a case entity is kept as an entity match and any other lookup is kept as a console event; none of them is mistaken for an incident or ticket record. Both are covered by tests. Response actions (FR-11: isolate device, disable account) are not captured: generic capture reads searches only, and detecting actions would need a rule per console.
+
 ## 22 October 2026
 
 ### The app ships rules-only; the model waits for Gate 2
