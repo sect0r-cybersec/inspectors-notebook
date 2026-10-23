@@ -21,3 +21,7 @@ For each console you can reach in a lab (Elastic/Kibana, LogScale, Splunk, Chron
 - [ ] Opening a second incident in the same console is not a ticket: the suggestion waits for the dwell and a pivot, as before.
 
 Where generic capture misreads a console, save a HAR of one search as in `tests/manual/S3-lab-capture-guide.md`; a console parser can then read it exactly.
+
+## Enrichment lookups (FR-11, FR-17)
+
+- [ ] Add VirusTotal (or AbuseIPDB) with **Listen on this site**. During a case, look up a case entity: the lookup is kept with the reason Case entity. Look up another value: it is kept as an ordinary page visit. Neither suggests a new case.

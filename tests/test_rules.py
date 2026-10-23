@@ -31,6 +31,22 @@ def test_console_events_are_kept_during_a_case():  # FR-17
     assert decide(query("DeviceInfo | take 1"), CaseContext()).reason == "console"
 
 
+def test_enrichment_lookups_on_an_added_site_are_kept_and_matched_by_url():  # FR-11, FR-17
+    # VirusTotal and AbuseIPDB put the value looked up in the URL; the analyst adds those sites.
+    sha = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
+    case = CaseContext(entities=["203.0.113.7", sha, "evil.example.com"])
+    for url in (
+        "https://www.virustotal.com/gui/ip-address/203.0.113.7",
+        f"https://www.virustotal.com/gui/file/{sha}/detection",
+        "https://www.virustotal.com/gui/domain/evil.example.com/relations",
+        "https://www.abuseipdb.com/check/203.0.113.7",
+    ):
+        d = decide(page(url, console="www.virustotal.com"), case)
+        assert (d.disposition, d.reason) == (KEEP, "entity"), url
+    other = decide(page("https://www.abuseipdb.com/check/192.0.2.50", console="www.abuseipdb.com"), case)
+    assert (other.disposition, other.reason) == (KEEP, "console")
+
+
 def test_zero_result_queries_are_kept_as_negative_findings():  # FR-20
     d = decide(result([]), CaseContext())
     assert (d.disposition, d.reason) == (KEEP, "negative_finding")
