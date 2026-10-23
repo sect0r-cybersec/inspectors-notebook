@@ -44,6 +44,12 @@ test("list pages and other pages are not records", () => {
     "https://docs.example.com/how-incidents-work",
     "https://example.com/?id=12345",
     "https://jira.example.com/browse/soc-123",
+    // Enrichment lookups (FR-11) are kept as page visits but are not records, so they never suggest a case.
+    "https://www.virustotal.com/gui/ip-address/203.0.113.7",
+    "https://www.virustotal.com/gui/file/275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f/detection",
+    "https://www.virustotal.com/gui/domain/evil.example.com/relations",
+    "https://www.abuseipdb.com/check/203.0.113.7",
+    "https://urlscan.io/result/0193f1a2-7c9e-7000-8000-000000000001/",
     "not a url",
   ]) {
     assert.equal(recordFromUrl(url), null, url);
